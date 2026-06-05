@@ -34,7 +34,7 @@ export default function AddHabitModal({ isOpen, onClose, onAdd }: AddHabitModalP
     setError('');
     
     if (!name.trim()) {
-      setError('Please enter a habit name');
+      setError('Please enter a commit name');
       return;
     }
     
@@ -45,7 +45,7 @@ export default function AddHabitModal({ isOpen, onClose, onAdd }: AddHabitModalP
       setColor(PRESET_COLORS[0]);
       onClose();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to create habit');
+      setError(err instanceof Error ? err.message : 'Failed to create commit');
     } finally {
       setLoading(false);
     }
@@ -54,16 +54,16 @@ export default function AddHabitModal({ isOpen, onClose, onAdd }: AddHabitModalP
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-zinc-800 rounded-xl p-6 w-full max-w-md mx-4">
-        <h2 className="text-xl font-bold mb-4">Add New Habit</h2>
+        <h2 className="text-xl font-bold mb-4">Add New Commit</h2>
         
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
-            <label className="block text-sm text-zinc-400 mb-2">Habit Name</label>
+            <label className="block text-sm text-zinc-400 mb-2">Commit Name</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., Reading, Exercise, Journaling..."
+              placeholder="e.g., Writing, Health, Money..."
               className="w-full px-4 py-2 bg-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-white/30"
               autoFocus
             />
@@ -115,7 +115,7 @@ export default function AddHabitModal({ isOpen, onClose, onAdd }: AddHabitModalP
               className="flex-1 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
               style={{ backgroundColor: color }}
             >
-              {loading ? 'Adding...' : 'Add Habit'}
+              {loading ? 'Adding...' : 'Add Commit'}
             </button>
           </div>
         </form>

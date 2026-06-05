@@ -1,85 +1,355 @@
 import Database from 'better-sqlite3';
 import path from 'path';
+import { COMMIT_TYPES, LIFE_AREAS } from './constants';
+import type { CommitType } from './constants';
 
 const dbPath = path.join(process.cwd(), 'data', 'habits.db');
 const db = new Database(dbPath);
 
-// Initialize tables
-db.exec(`
-  CREATE TABLE IF NOT EXISTS habits (
-    id INTEGER PRIMARY KEY,
-    name TEXT NOT NULL UNIQUE,
-    color TEXT NOT NULL DEFAULT '#22c55e'
-  );
+export { COMMIT_TYPES, LIFE_AREAS };
+export type { CommitType };
 
-  CREATE TABLE IF NOT EXISTS entries (
-    id INTEGER PRIMARY KEY,
-    habit_id INTEGER NOT NULL,
-    date TEXT NOT NULL,
-    completed INTEGER NOT NULL DEFAULT 0,
-    UNIQUE(habit_id, date),
-    FOREIGN KEY (habit_id) REFERENCES habits(id)
-  );
-`);
-
-// Seed habits if empty
-const count = db.prepare('SELECT COUNT(*) as count FROM habits').get() as { count: number };
-if (count.count === 0) {
-  const insert = db.prepare('INSERT INTO habits (id, name, color) VALUES (?, ?, ?)');
-  insert.run(1, 'Workout', '#22c55e');
-  insert.run(2, 'Calories', '#3b82f6');
-  insert.run(3, 'Wake Time', '#f59e0b');
-  insert.run(4, 'Meditation', '#a855f7');
-}
-
-export interface Habit {
+export interface Area {
   id: number;
   name: string;
   color: string;
 }
 
+export type Habit = Area;
+
 export interface Entry {
   id: number;
-  habit_id: number;
+  area_id: number;
   date: string;
+  count: number;
   completed: number;
 }
 
-export function getHabits(): Habit[] {
-  return db.prepare('SELECT * FROM habits').all() as Habit[];
+export interface LifeCommit {
+  id: number;
+  title: string;
+  description: string;
+  date: string;
+  areaId: number;
+  areaName: string;
+  areaColor: string;
+  type: CommitType;
+  tags: string[];
+  seed: string;
+  createdAt: string;
 }
 
-export function getEntries(habitId: number, year: number): Entry[] {
-  const startDate = `${year}-01-01`;
-  const endDate = `${year}-12-31`;
-  return db.prepare(
-    'SELECT * FROM entries WHERE habit_id = ? AND date >= ? AND date <= ?'
-  ).all(habitId, startDate, endDate) as Entry[];
+export interface GratitudeEntry {
+  id: number;
+  date: string;
+  text: string;
+  createdAt: string;
 }
 
-export function upsertEntry(habitId: number, date: string, completed: boolean): Entry {
-  db.prepare(`
-    INSERT INTO entries (habit_id, date, completed)
+export interface CreateCommitInput {
+  title: string;
+  description: string;
+  date: string;
+  areaId: number;
+  type: CommitType;
+  tags: string[];
+  seed: string;
+}
+
+export interface DashboardStats {
+  totalCommits: number;
+  streakDays: number;
+  recent30: { date: string; count: number }[];
+  areaDistribution: { areaId: number; areaName: string; color: string; count: number }[];
+  topTags: { name: string; count: number }[];
+  topSeeds: { name: string; count: number }[];
+}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS areas (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    color TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS commits (
+    id INTEGER PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    date TEXT NOT NULL,
+    area_id INTEGER,
+    type TEXT NOT NULL DEFAULT 'Reflection',
+    tags TEXT NOT NULL DEFAULT '[]',
+    seed TEXT NOT NULL DEFAULT '',
+    duration TEXT NOT NULL DEFAULT '',
+    note TEXT NOT NULL DEFAULT '',
+    primary_area_id INTEGER,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (area_id) REFERENCES areas(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS gratitude_entries (
+    id INTEGER PRIMARY KEY,
+    date TEXT NOT NULL,
+    text TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+function columnNames(tableName: string) {
+  return new Set((db.prepare(`PRAGMA table_info(${tableName})`).all() as { name: string }[]).map(column => column.name));
+}
+
+function ensureColumn(tableName: string, columnName: string, definition: string) {
+  const columns = columnNames(tableName);
+  if (!columns.has(columnName)) {
+    db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+  }
+}
+
+ensureColumn('commits', 'description', "TEXT NOT NULL DEFAULT ''");
+ensureColumn('commits', 'area_id', 'INTEGER');
+ensureColumn('commits', 'type', "TEXT NOT NULL DEFAULT 'Reflection'");
+ensureColumn('commits', 'tags', "TEXT NOT NULL DEFAULT '[]'");
+ensureColumn('commits', 'seed', "TEXT NOT NULL DEFAULT ''");
+
+function syncFixedAreas() {
+  const upsert = db.prepare(`
+    INSERT INTO areas (id, name, color)
     VALUES (?, ?, ?)
-    ON CONFLICT(habit_id, date) DO UPDATE SET completed = excluded.completed
-  `).run(habitId, date, completed ? 1 : 0);
-  
-  return db.prepare(
-    'SELECT * FROM entries WHERE habit_id = ? AND date = ?'
-  ).get(habitId, date) as Entry;
+    ON CONFLICT(id) DO UPDATE SET name = excluded.name, color = excluded.color
+  `);
+
+  const allowedIds = LIFE_AREAS.map(area => area.id);
+  const transaction = db.transaction(() => {
+    for (const area of LIFE_AREAS) {
+      upsert.run(area.id, area.name, area.color);
+    }
+    db.prepare(`DELETE FROM areas WHERE id NOT IN (${allowedIds.map(() => '?').join(',')})`).run(...allowedIds);
+  });
+
+  transaction();
 }
 
-export function createHabit(name: string, color: string): Habit {
-  const result = db.prepare('INSERT INTO habits (name, color) VALUES (?, ?)').run(name, color);
-  return db.prepare('SELECT * FROM habits WHERE id = ?').get(result.lastInsertRowid) as Habit;
+syncFixedAreas();
+
+db.prepare(`
+  UPDATE commits
+  SET area_id = COALESCE(area_id, primary_area_id, 1),
+      description = CASE WHEN description = '' AND note IS NOT NULL THEN note ELSE description END
+  WHERE area_id IS NULL OR description = ''
+`).run();
+
+function parseTags(value: string | null): string[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter(tag => typeof tag === 'string') : [];
+  } catch {
+    return value.split(',').map(tag => tag.trim()).filter(Boolean);
+  }
 }
 
-export function getAllEntriesForYear(year: number): Entry[] {
+function toCommit(row: {
+  id: number;
+  title: string;
+  description: string;
+  date: string;
+  area_id: number;
+  area_name: string;
+  area_color: string;
+  type: string;
+  tags: string;
+  seed: string;
+  created_at: string;
+}): LifeCommit {
+  const type = COMMIT_TYPES.includes(row.type as CommitType) ? row.type as CommitType : 'Reflection';
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    date: row.date,
+    areaId: row.area_id,
+    areaName: row.area_name,
+    areaColor: row.area_color,
+    type,
+    tags: parseTags(row.tags),
+    seed: row.seed,
+    createdAt: row.created_at,
+  };
+}
+
+function commitSelect(where = '') {
+  return `
+    SELECT c.id, c.title, c.description, c.date, c.area_id, c.type, c.tags, c.seed, c.created_at,
+           a.name as area_name, a.color as area_color
+    FROM commits c
+    JOIN areas a ON a.id = c.area_id
+    ${where}
+  `;
+}
+
+export function getAreas(): Area[] {
+  return db.prepare('SELECT * FROM areas ORDER BY id').all() as Area[];
+}
+
+export function getAreaEntries(areaId: number, year: number): Entry[] {
   const startDate = `${year}-01-01`;
   const endDate = `${year}-12-31`;
-  return db.prepare(
-    'SELECT * FROM entries WHERE date >= ? AND date <= ?'
-  ).all(startDate, endDate) as Entry[];
+  return db.prepare(`
+    SELECT MIN(id) as id, area_id, date, COUNT(*) as count, 1 as completed
+    FROM commits
+    WHERE area_id = ? AND date >= ? AND date <= ?
+    GROUP BY area_id, date
+    ORDER BY date
+  `).all(areaId, startDate, endDate) as Entry[];
+}
+
+export function getAllAreaEntriesForYear(year: number): Entry[] {
+  const startDate = `${year}-01-01`;
+  const endDate = `${year}-12-31`;
+  return db.prepare(`
+    SELECT MIN(id) as id, area_id, date, COUNT(*) as count, 1 as completed
+    FROM commits
+    WHERE date >= ? AND date <= ?
+    GROUP BY area_id, date
+    ORDER BY date
+  `).all(startDate, endDate) as Entry[];
+}
+
+export function getCommits(options: { date?: string; areaId?: number; limit?: number } = {}): LifeCommit[] {
+  const clauses: string[] = [];
+  const params: (string | number)[] = [];
+
+  if (options.date) {
+    clauses.push('c.date = ?');
+    params.push(options.date);
+  }
+  if (options.areaId) {
+    clauses.push('c.area_id = ?');
+    params.push(options.areaId);
+  }
+
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const limit = options.limit ? `LIMIT ${options.limit}` : '';
+  const rows = db.prepare(`${commitSelect(where)} ORDER BY c.date DESC, c.created_at DESC, c.id DESC ${limit}`).all(...params) as Parameters<typeof toCommit>[0][];
+  return rows.map(toCommit);
+}
+
+export function createCommit(input: CreateCommitInput): LifeCommit {
+  const areaIds = new Set<number>(LIFE_AREAS.map(area => area.id));
+  if (!areaIds.has(input.areaId)) {
+    throw new Error('Area must be one of the fixed life areas');
+  }
+  if (!COMMIT_TYPES.includes(input.type)) {
+    throw new Error('Commit type is not supported');
+  }
+
+  const tags = input.tags.map(tag => tag.trim()).filter(Boolean);
+  const result = db.prepare(`
+    INSERT INTO commits (title, description, date, area_id, type, tags, seed, duration, note, primary_area_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, ?)
+  `).run(input.title, input.description, input.date, input.areaId, input.type, JSON.stringify(tags), input.seed, input.description, input.areaId);
+
+  return getCommits({ limit: 1 }).find(commit => commit.id === Number(result.lastInsertRowid)) as LifeCommit;
+}
+
+export function getSeeds() {
+  const rows = db.prepare(`
+    SELECT seed, COUNT(*) as count, MAX(date) as lastDate
+    FROM commits
+    WHERE seed != ''
+    GROUP BY seed
+    ORDER BY lastDate DESC, count DESC
+  `).all() as { seed: string; count: number; lastDate: string }[];
+
+  return rows.map(row => ({
+    seed: row.seed,
+    count: row.count,
+    lastDate: row.lastDate,
+    commits: getCommits({ limit: 200 }).filter(commit => commit.seed === row.seed),
+  }));
+}
+
+export function getGratitudeEntries(date: string): GratitudeEntry[] {
+  return db.prepare(`
+    SELECT id, date, text, created_at as createdAt
+    FROM gratitude_entries
+    WHERE date = ?
+    ORDER BY created_at DESC, id DESC
+  `).all(date) as GratitudeEntry[];
+}
+
+export function createGratitudeEntry(date: string, text: string): GratitudeEntry {
+  const count = db.prepare('SELECT COUNT(*) as count FROM gratitude_entries WHERE date = ?').get(date) as { count: number };
+  if (count.count >= 10) {
+    throw new Error('You can record up to 10 gratitude items per day');
+  }
+  const result = db.prepare('INSERT INTO gratitude_entries (date, text) VALUES (?, ?)').run(date, text);
+  return db.prepare(`
+    SELECT id, date, text, created_at as createdAt
+    FROM gratitude_entries
+    WHERE id = ?
+  `).get(result.lastInsertRowid) as GratitudeEntry;
+}
+
+function dateDaysAgo(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function getDashboardStats(): DashboardStats {
+  const total = db.prepare('SELECT COUNT(*) as count FROM commits').get() as { count: number };
+  const recent30 = db.prepare(`
+    SELECT date, COUNT(*) as count
+    FROM commits
+    WHERE date >= ?
+    GROUP BY date
+    ORDER BY date
+  `).all(dateDaysAgo(29)) as { date: string; count: number }[];
+
+  const commitDates = new Set((db.prepare('SELECT DISTINCT date FROM commits').all() as { date: string }[]).map(row => row.date));
+  let streakDays = 0;
+  for (let i = 0; i < 3650; i++) {
+    if (commitDates.has(dateDaysAgo(i))) {
+      streakDays++;
+    } else {
+      break;
+    }
+  }
+
+  const areaDistribution = db.prepare(`
+    SELECT a.id as areaId, a.name as areaName, a.color, COUNT(c.id) as count
+    FROM areas a
+    LEFT JOIN commits c ON c.area_id = a.id
+    GROUP BY a.id
+    ORDER BY a.id
+  `).all() as DashboardStats['areaDistribution'];
+
+  const commits = getCommits({ limit: 1000 });
+  const countValues = (values: string[]) => {
+    const counts = new Map<string, number>();
+    for (const value of values) {
+      if (value) counts.set(value, (counts.get(value) || 0) + 1);
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([name, count]) => ({ name, count }));
+  };
+
+  return {
+    totalCommits: total.count,
+    streakDays,
+    recent30,
+    areaDistribution,
+    topTags: countValues(commits.flatMap(commit => commit.tags)),
+    topSeeds: countValues(commits.map(commit => commit.seed)),
+  };
 }
 
 export default db;

@@ -1,324 +1,347 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
+import CommitForm from '@/components/CommitForm';
 import HabitGrid from '@/components/HabitGrid';
 import MiniHabitGrid from '@/components/MiniHabitGrid';
+import ThemeToggle from '@/components/ThemeToggle';
 import ViewToggle from '@/components/ViewToggle';
-import AddHabitModal from '@/components/AddHabitModal';
-import { Habit, Entry } from '@/lib/db';
+import type { Area, CommitType, DashboardStats, Entry, LifeCommit } from '@/lib/db';
+
+function localDate(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function weekStartDate() {
+  const date = new Date();
+  const day = date.getDay();
+  date.setDate(date.getDate() - day);
+  return localDate(date);
+}
+
+function Recent30Heatmap({ days }: { days: { date: string; count: number }[] }) {
+  const counts = new Map(days.map(day => [day.date, day.count]));
+  const cells = Array.from({ length: 30 }, (_, index) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (29 - index));
+    const dateStr = localDate(date);
+    const count = counts.get(dateStr) || 0;
+    return { date: dateStr, count };
+  });
+
+  return (
+    <div className="flex gap-[3px]">
+      {cells.map(cell => (
+        <div
+          key={cell.date}
+          title={`${cell.date} - ${cell.count} commits`}
+          className="w-3 h-3 rounded-sm"
+          style={{
+            backgroundColor: cell.count === 0 ? 'var(--grid-empty)' : cell.count === 1 ? '#22c55e88' : cell.count === 2 ? '#22c55ecc' : '#22c55e',
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function CommitItem({ commit }: { commit: LifeCommit }) {
+  return (
+    <div className="border-b border-zinc-700/60 last:border-b-0 py-3 first:pt-0 last:pb-0">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-medium">{commit.title}</span>
+        <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-700 text-zinc-300">{commit.type}</span>
+        <span className="text-sm" style={{ color: commit.areaColor }}>{commit.areaName}</span>
+        <span className="text-sm text-zinc-500">{commit.date}</span>
+      </div>
+      {commit.description && <p className="text-sm text-zinc-400 mt-1">{commit.description}</p>}
+      {(commit.tags.length > 0 || commit.seed) && (
+        <div className="flex flex-wrap gap-2 mt-2 text-xs text-zinc-400">
+          {commit.tags.map(tag => <span key={tag} className="px-2 py-1 rounded bg-zinc-900/70">{tag}</span>)}
+          {commit.seed && <span className="px-2 py-1 rounded bg-zinc-900/70">Seed: {commit.seed}</span>}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Home() {
-  const [habits, setHabits] = useState<Habit[]>([]);
-  const [activeHabit, setActiveHabit] = useState<number | null>(null); // null = dashboard view
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [activeArea, setActiveArea] = useState<number | null>(null);
   const [view, setView] = useState<'year' | 'month'>('year');
-  const [year, setYear] = useState<number>(new Date().getFullYear());
-  const [month, setMonth] = useState<number>(new Date().getMonth());
-  const [entries, setEntries] = useState<Entry[]>([]);
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [month, setMonth] = useState(new Date().getMonth());
   const [allEntries, setAllEntries] = useState<Entry[]>([]);
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [areaEntries, setAreaEntries] = useState<Entry[]>([]);
+  const [todayCommits, setTodayCommits] = useState<LifeCommit[]>([]);
+  const [recentCommits, setRecentCommits] = useState<LifeCommit[]>([]);
+  const [dashboard, setDashboard] = useState<DashboardStats | null>(null);
 
-  const activeHabitData = habits.find(h => h.id === activeHabit);
+  const today = localDate();
+  const activeAreaData = areas.find(area => area.id === activeArea);
 
-  // Fetch habits on mount
+  async function refresh() {
+    const [areasRes, entriesRes, todayRes, recentRes, dashboardRes] = await Promise.all([
+      fetch('/api/areas'),
+      fetch(`/api/entries?area=all&year=${year}`),
+      fetch(`/api/commits?date=${today}`),
+      fetch('/api/commits?limit=30'),
+      fetch('/api/dashboard'),
+    ]);
+    setAreas(await areasRes.json());
+    setAllEntries(await entriesRes.json());
+    setTodayCommits(await todayRes.json());
+    setRecentCommits(await recentRes.json());
+    setDashboard(await dashboardRes.json());
+  }
+
   useEffect(() => {
-    fetch('/api/habits')
-      .then(res => res.json())
-      .then(setHabits);
-  }, []);
+    let cancelled = false;
 
-  // Fetch all entries for dashboard
-  useEffect(() => {
-    fetch(`/api/entries?habit=all&year=${year}`)
-      .then(res => res.json())
-      .then(setAllEntries);
-  }, [year]);
+    async function loadInitialData() {
+      const [areasRes, entriesRes, todayRes, recentRes, dashboardRes] = await Promise.all([
+        fetch('/api/areas'),
+        fetch(`/api/entries?area=all&year=${year}`),
+        fetch(`/api/commits?date=${today}`),
+        fetch('/api/commits?limit=30'),
+        fetch('/api/dashboard'),
+      ]);
 
-  // Fetch entries for single habit view
-  useEffect(() => {
-    if (activeHabit !== null) {
-      fetch(`/api/entries?habit=${activeHabit}&year=${year}`)
-        .then(res => res.json())
-        .then(setEntries);
+      if (!cancelled) {
+        setAreas(await areasRes.json());
+        setAllEntries(await entriesRes.json());
+        setTodayCommits(await todayRes.json());
+        setRecentCommits(await recentRes.json());
+        setDashboard(await dashboardRes.json());
+      }
     }
-  }, [activeHabit, year]);
 
-  const handleToggle = useCallback(async (date: string, completed: boolean) => {
-    if (activeHabit === null) return;
-    
-    const res = await fetch('/api/entries', {
+    loadInitialData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [year, today]);
+
+  useEffect(() => {
+    if (activeArea !== null) {
+      Promise.all([
+        fetch(`/api/entries?area=${activeArea}&year=${year}`),
+        fetch(`/api/commits?area=${activeArea}&limit=20`),
+      ]).then(async ([entriesRes, commitsRes]) => {
+        setAreaEntries(await entriesRes.json());
+        setRecentCommits(await commitsRes.json());
+      });
+    }
+  }, [activeArea, year]);
+
+  const thisWeekCommits = useMemo(() => {
+    const start = weekStartDate();
+    return recentCommits.filter(commit => commit.date >= start);
+  }, [recentCommits]);
+
+  const weekByType = useMemo(() => {
+    const counts = new Map<CommitType, number>();
+    for (const commit of thisWeekCommits) {
+      counts.set(commit.type, (counts.get(commit.type) || 0) + 1);
+    }
+    return [...counts.entries()];
+  }, [thisWeekCommits]);
+
+  const handleCreateCommit = async (input: {
+    title: string;
+    description: string;
+    areaId: number;
+    type: CommitType;
+    tags: string[];
+    seed: string;
+  }) => {
+    const res = await fetch('/api/commits', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ habitId: activeHabit, date, completed }),
+      body: JSON.stringify({ ...input, date: today }),
     });
-    
-    if (res.ok) {
-      const updated = await res.json();
-      setEntries(prev => {
-        const existing = prev.findIndex(e => e.date === date);
-        if (existing >= 0) {
-          const newEntries = [...prev];
-          newEntries[existing] = updated;
-          return newEntries;
-        }
-        return [...prev, updated];
-      });
-      // Also update allEntries for dashboard
-      setAllEntries(prev => {
-        const existing = prev.findIndex(e => e.date === date && e.habit_id === activeHabit);
-        if (existing >= 0) {
-          const newEntries = [...prev];
-          newEntries[existing] = updated;
-          return newEntries;
-        }
-        return [...prev, updated];
-      });
-    }
-  }, [activeHabit]);
 
-  const handleAddHabit = async (name: string, color: string) => {
-    const res = await fetch('/api/habits', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, color }),
-    });
-    
     if (!res.ok) {
       const error = await res.json();
-      throw new Error(error.error || 'Failed to create habit');
+      throw new Error(error.error || 'Failed to save commit');
     }
-    
-    const newHabit = await res.json();
-    setHabits(prev => [...prev, newHabit]);
+    await refresh();
   };
 
-  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
                   'July', 'August', 'September', 'October', 'November', 'December'];
 
-  // Dashboard View
-  if (activeHabit === null) {
+  if (activeArea !== null) {
     return (
       <main className="min-h-screen bg-zinc-900 text-white p-8">
         <div className="max-w-6xl mx-auto">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-8">
-            <h1 className="text-3xl font-bold">Habit Grid</h1>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          <div className="flex items-center gap-4 mb-8">
+            <button onClick={() => setActiveArea(null)} className="p-2 hover:bg-zinc-800 rounded-lg transition-colors">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
-              Add Habit
             </button>
+            <div className="flex items-center gap-3">
+              <div className="w-4 h-4 rounded-full" style={{ backgroundColor: activeAreaData?.color }} />
+              <h1 className="text-3xl font-bold">{activeAreaData?.name}</h1>
+            </div>
+            <div className="flex-1" />
+            <ThemeToggle />
+            <ViewToggle view={view} onToggle={setView} />
           </div>
 
-          {/* Year Navigation */}
           <div className="flex items-center gap-4 mb-6">
             <button
-              onClick={() => setYear(y => y - 1)}
+              onClick={() => view === 'year' ? setYear(value => value - 1) : setMonth(value => value === 0 ? (setYear(yearValue => yearValue - 1), 11) : value - 1)}
               className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            
-            <h2 className="text-xl font-semibold">{year}</h2>
-            
+            <h2 className="text-xl font-semibold min-w-[160px] text-center">
+              {view === 'year' ? year : `${MONTHS[month]} ${year}`}
+            </h2>
             <button
-              onClick={() => setYear(y => y + 1)}
+              onClick={() => view === 'year' ? setYear(value => value + 1) : setMonth(value => value === 11 ? (setYear(yearValue => yearValue + 1), 0) : value + 1)}
               className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
-            
-            <button
-              onClick={() => setYear(new Date().getFullYear())}
-              className="px-3 py-1 text-sm bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors"
-            >
-              This Year
-            </button>
           </div>
 
-          {/* Dashboard Grid */}
-          {habits.length === 0 ? (
-            <div className="text-center py-16">
-              <p className="text-zinc-400 text-lg mb-4">No habits yet</p>
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="px-6 py-3 bg-green-600 hover:bg-green-500 rounded-lg font-medium transition-colors"
-              >
-                Create Your First Habit
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {habits.map(habit => {
-                const habitEntries = allEntries.filter(e => e.habit_id === habit.id);
-                return (
-                  <MiniHabitGrid
-                    key={habit.id}
-                    habitId={habit.id}
-                    habitName={habit.name}
-                    color={habit.color}
-                    year={year}
-                    entries={habitEntries}
-                    onClick={() => setActiveHabit(habit.id)}
-                  />
-                );
-              })}
-            </div>
-          )}
+          <div className="bg-zinc-800/50 rounded-xl p-6 mb-6">
+            {activeAreaData && (
+              <HabitGrid habitId={activeArea} color={activeAreaData.color} view={view} year={year} month={month} entries={areaEntries} />
+            )}
+          </div>
 
-          {/* Add Habit Modal */}
-          <AddHabitModal
-            isOpen={showAddModal}
-            onClose={() => setShowAddModal(false)}
-            onAdd={handleAddHabit}
-          />
+          <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-4">
+            <div className="bg-zinc-800/50 rounded-xl p-5">
+              <div className="text-zinc-400 text-sm mb-1">Commit Total</div>
+              <div className="text-4xl font-bold">{areaEntries.reduce((sum, entry) => sum + entry.count, 0)}</div>
+            </div>
+            <section className="bg-zinc-800/50 rounded-xl p-5">
+              <h2 className="text-xl font-semibold mb-4">Recent Commits</h2>
+              {recentCommits.length === 0 ? <p className="text-zinc-400">No commits in this area yet</p> : recentCommits.map(commit => <CommitItem key={commit.id} commit={commit} />)}
+            </section>
+          </div>
         </div>
       </main>
     );
   }
 
-  // Single Habit Detail View
   return (
     <main className="min-h-screen bg-zinc-900 text-white p-8">
       <div className="max-w-6xl mx-auto">
-        {/* Header with Back Button */}
-        <div className="flex items-center gap-4 mb-8">
-          <button
-            onClick={() => setActiveHabit(null)}
-            className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <div className="flex items-center gap-3">
-            <div 
-              className="w-4 h-4 rounded-full"
-              style={{ backgroundColor: activeHabitData?.color }}
-            />
-            <h1 className="text-3xl font-bold">{activeHabitData?.name}</h1>
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+          <div>
+            <p className="text-sm font-medium text-zinc-400 mb-1">Clarice Life Commit</p>
+            <h1 className="text-3xl font-bold">What did you commit today?</h1>
           </div>
-          
-          <div className="flex-1" />
-          
-          <ViewToggle view={view} onToggle={setView} />
+          <div className="flex gap-2">
+            <Link href="/seeds" className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors">Seeds</Link>
+            <Link href="/gratitude" className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors">Gratitude</Link>
+            <ThemeToggle />
+          </div>
         </div>
 
-        {/* Year/Month Navigation */}
+        <CommitForm areas={areas} onCommit={handleCreateCommit} />
+
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className="bg-zinc-800/50 rounded-xl p-5">
+            <div className="text-zinc-400 text-sm mb-1">Total Commits</div>
+            <div className="text-4xl font-bold">{dashboard?.totalCommits ?? 0}</div>
+          </div>
+          <div className="bg-zinc-800/50 rounded-xl p-5">
+            <div className="text-zinc-400 text-sm mb-1">Commit Streak</div>
+            <div className="text-4xl font-bold">{dashboard?.streakDays ?? 0}</div>
+          </div>
+          <div className="bg-zinc-800/50 rounded-xl p-5">
+            <div className="text-zinc-400 text-sm mb-3">Last 30 Days</div>
+            <Recent30Heatmap days={dashboard?.recent30 ?? []} />
+          </div>
+        </section>
+
+        <section className="bg-zinc-800/50 rounded-xl p-5 mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">Today</h2>
+            <span className="text-sm text-zinc-500">{today}</span>
+          </div>
+          {todayCommits.length === 0 ? <p className="text-zinc-400">No commits yet today</p> : todayCommits.map(commit => <CommitItem key={commit.id} commit={commit} />)}
+        </section>
+
+        <section className="bg-zinc-800/50 rounded-xl p-5 mb-8">
+          <h2 className="text-xl font-semibold mb-4">This Week</h2>
+          {thisWeekCommits.length === 0 ? (
+            <p className="text-zinc-400">No commits this week yet</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+              {weekByType.map(([type, count]) => (
+                <div key={type} className="bg-zinc-900/60 rounded-lg p-3">
+                  <div className="text-2xl font-bold">{count}</div>
+                  <div className="text-sm text-zinc-400">{type}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="bg-zinc-800/50 rounded-xl p-5 mb-8">
+          <h2 className="text-xl font-semibold mb-4">Recent Commits</h2>
+          {recentCommits.length === 0 ? <p className="text-zinc-400">No commits yet</p> : recentCommits.slice(0, 12).map(commit => <CommitItem key={commit.id} commit={commit} />)}
+        </section>
+
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+          <div className="bg-zinc-800/50 rounded-xl p-5">
+            <h2 className="text-xl font-semibold mb-4">Top Tags</h2>
+            <div className="flex flex-wrap gap-2">
+              {(dashboard?.topTags.length ? dashboard.topTags : []).map(tag => <span key={tag.name} className="px-2 py-1 rounded bg-zinc-900/70 text-sm">{tag.name} · {tag.count}</span>)}
+            </div>
+          </div>
+          <div className="bg-zinc-800/50 rounded-xl p-5">
+            <h2 className="text-xl font-semibold mb-4">Top Seeds</h2>
+            <div className="flex flex-wrap gap-2">
+              {(dashboard?.topSeeds.length ? dashboard.topSeeds : []).map(seed => <span key={seed.name} className="px-2 py-1 rounded bg-zinc-900/70 text-sm">{seed.name} · {seed.count}</span>)}
+            </div>
+          </div>
+        </section>
+
         <div className="flex items-center gap-4 mb-6">
-          <button
-            onClick={() => view === 'year' ? setYear(y => y - 1) : setMonth(m => m === 0 ? (setYear(y => y - 1), 11) : m - 1)}
-            className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
-          >
+          <button onClick={() => setYear(value => value - 1)} className="p-2 hover:bg-zinc-800 rounded-lg transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          
-          <h2 className="text-xl font-semibold min-w-[160px] text-center">
-            {view === 'year' ? year : `${MONTHS[month]} ${year}`}
-          </h2>
-          
-          <button
-            onClick={() => view === 'year' ? setYear(y => y + 1) : setMonth(m => m === 11 ? (setYear(y => y + 1), 0) : m + 1)}
-            className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
-          >
+          <h2 className="text-xl font-semibold">{year}</h2>
+          <button onClick={() => setYear(value => value + 1)} className="p-2 hover:bg-zinc-800 rounded-lg transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
-          
-          <button
-            onClick={() => {
-              setYear(new Date().getFullYear());
-              setMonth(new Date().getMonth());
-            }}
-            className="px-3 py-1 text-sm bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors"
-          >
-            Today
+          <button onClick={() => setYear(new Date().getFullYear())} className="px-3 py-1 text-sm bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors">
+            This Year
           </button>
         </div>
 
-        {/* Grid */}
-        <div className="bg-zinc-800/50 rounded-xl p-6">
-          {activeHabitData && (
-            <HabitGrid
-              habitId={activeHabit}
-              color={activeHabitData.color}
-              view={view}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {areas.map(area => (
+            <MiniHabitGrid
+              key={area.id}
+              habitName={area.name}
+              color={area.color}
               year={year}
-              month={month}
-              entries={entries}
-              onToggle={handleToggle}
+              entries={allEntries.filter(entry => entry.area_id === area.id)}
+              onClick={() => setActiveArea(area.id)}
             />
-          )}
-        </div>
-
-        {/* Legend */}
-        <div className="flex items-center justify-end gap-2 mt-4 text-sm text-zinc-500">
-          <span>Less</span>
-          <div className="w-3 h-3 rounded-sm bg-zinc-800" />
-          <div
-            className="w-3 h-3 rounded-sm"
-            style={{ backgroundColor: activeHabitData?.color, opacity: 0.4 }}
-          />
-          <div
-            className="w-3 h-3 rounded-sm"
-            style={{ backgroundColor: activeHabitData?.color, opacity: 0.7 }}
-          />
-          <div
-            className="w-3 h-3 rounded-sm"
-            style={{ backgroundColor: activeHabitData?.color }}
-          />
-          <span>More</span>
-        </div>
-
-        {/* Stats */}
-        <div className="mt-8 p-6 bg-zinc-800/50 rounded-xl">
-          <div className="grid grid-cols-3 gap-8">
-            <div>
-              <div className="text-zinc-400 text-sm mb-1">Completed</div>
-              <div className="text-3xl font-bold">
-                {entries.filter(e => e.completed === 1).length}
-                <span className="text-lg text-zinc-500 font-normal ml-2">days</span>
-              </div>
-            </div>
-            <div>
-              <div className="text-zinc-400 text-sm mb-1">Completion Rate</div>
-              <div className="text-3xl font-bold">
-                {Math.round((entries.filter(e => e.completed === 1).length / (view === 'year' ? 365 : new Date(year, month + 1, 0).getDate())) * 100)}%
-              </div>
-            </div>
-            <div>
-              <div className="text-zinc-400 text-sm mb-1">Current Streak</div>
-              <div className="text-3xl font-bold" style={{ color: activeHabitData?.color }}>
-                {(() => {
-                  const entryMap = new Map(entries.map(e => [e.date, e.completed === 1]));
-                  let streak = 0;
-                  const today = new Date();
-                  for (let i = 0; i <= 365; i++) {
-                    const date = new Date(today);
-                    date.setDate(date.getDate() - i);
-                    const dateStr = date.toISOString().split('T')[0];
-                    if (entryMap.get(dateStr)) {
-                      streak++;
-                    } else {
-                      break;
-                    }
-                  }
-                  return streak;
-                })()}
-                <span className="text-lg text-zinc-500 font-normal ml-2">🔥</span>
-              </div>
-            </div>
-          </div>
+          ))}
         </div>
       </div>
     </main>

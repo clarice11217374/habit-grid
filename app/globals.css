@@ -1,13 +1,114 @@
 @import "tailwindcss";
 
 :root {
-  --background: #18181b;
-  --foreground: #fafafa;
+  color-scheme: light;
+  --page-bg: #faf8f5;
+  --text-main: #24292f;
+  --card-bg: #ffffff;
+  --card-soft: #fffdfa;
+  --text-muted: #6e7781;
+  --text-muted-strong: #57606a;
+  --border-color: #e8e2d8;
+  --input-bg: #ffffff;
+  --hover-bg: #f1ece5;
+  --grid-empty: #e8e2d8;
+  --placeholder: #a59b91;
+  --button-bg: #24292f;
+  --button-text: #ffffff;
+  --focus-ring: rgba(36, 41, 47, 0.22);
+  --shadow-card: 0 10px 30px rgba(90, 72, 48, 0.06);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --page-bg: #121214;
+  --text-main: #f4f4f5;
+  --card-bg: #1f1f23;
+  --card-soft: #25252a;
+  --text-muted: #a1a1aa;
+  --text-muted-strong: #d4d4d8;
+  --border-color: #2f2f35;
+  --input-bg: #242429;
+  --hover-bg: #2b2b31;
+  --grid-empty: #2b2b2f;
+  --placeholder: #71717a;
+  --button-bg: #f4f4f5;
+  --button-text: #121214;
+  --focus-ring: rgba(244, 244, 245, 0.28);
+  --shadow-card: none;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--page-bg);
+  color: var(--text-main);
+}
+
+.bg-zinc-900 {
+  background-color: var(--page-bg) !important;
+}
+
+.bg-zinc-900\/50,
+.bg-zinc-900\/60,
+.bg-zinc-900\/70 {
+  background-color: var(--card-soft) !important;
+}
+
+.bg-zinc-800,
+.bg-zinc-800\/50 {
+  background-color: var(--card-bg) !important;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-card);
+}
+
+.bg-zinc-700,
+.bg-zinc-700\/60 {
+  background-color: var(--input-bg) !important;
+  border: 1px solid var(--border-color);
+}
+
+.bg-white {
+  background-color: var(--button-bg) !important;
+}
+
+.hover\:bg-zinc-800:hover,
+.hover\:bg-zinc-700:hover,
+.hover\:bg-zinc-600:hover {
+  background-color: var(--hover-bg) !important;
+}
+
+.hover\:bg-zinc-200:hover {
+  background-color: var(--hover-bg) !important;
+}
+
+.text-white,
+.text-zinc-200,
+.text-zinc-300 {
+  color: var(--text-main) !important;
+}
+
+.text-zinc-950 {
+  color: var(--button-text) !important;
+}
+
+.text-zinc-400 {
+  color: var(--text-muted-strong) !important;
+}
+
+.text-zinc-500 {
+  color: var(--text-muted) !important;
+}
+
+.placeholder-zinc-500::placeholder {
+  color: var(--placeholder) !important;
+}
+
+.border-zinc-700\/60 {
+  border-color: var(--border-color) !important;
+}
+
+.ring-white\/30,
+.ring-white\/50 {
+  --tw-ring-color: var(--focus-ring) !important;
 }
 
 /* Smooth scrollbar for the year view */
@@ -16,15 +117,15 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #27272a;
+  background: var(--grid-empty);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #52525b;
+  background: var(--text-muted);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #71717a;
+  background: var(--text-muted-strong);
 }
