@@ -46,6 +46,16 @@ export interface GratitudeEntry {
   createdAt: string;
 }
 
+export interface AreaGoal {
+  areaId: number;
+  sixMonthGoal: string;
+  threeYearGoal: string;
+  focusPoints: string;
+  visionText: string;
+  visionImages: string[];
+  updatedAt: string;
+}
+
 export interface CreateCommitInput {
   title: string;
   description: string;
@@ -93,6 +103,17 @@ db.exec(`
     date TEXT NOT NULL,
     text TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS area_goals (
+    area_id INTEGER PRIMARY KEY,
+    six_month_goal TEXT NOT NULL DEFAULT '',
+    three_year_goal TEXT NOT NULL DEFAULT '',
+    focus_points TEXT NOT NULL DEFAULT '',
+    vision_text TEXT NOT NULL DEFAULT '',
+    vision_images TEXT NOT NULL DEFAULT '[]',
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (area_id) REFERENCES areas(id)
   );
 `);
 
@@ -150,6 +171,20 @@ function parseTags(value: string | null): string[] {
   }
 }
 
+function normalizeList(values: string[]) {
+  return [...new Set(values.map(value => value.trim()).filter(Boolean))];
+}
+
+function parseImages(value: string | null): string[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter(url => typeof url === 'string' && url.trim()).map(url => url.trim()) : [];
+  } catch {
+    return value.split('\n').map(url => url.trim()).filter(Boolean);
+  }
+}
+
 function toCommit(row: {
   id: number;
   title: string;
@@ -191,6 +226,68 @@ function commitSelect(where = '') {
 
 export function getAreas(): Area[] {
   return db.prepare('SELECT * FROM areas ORDER BY id').all() as Area[];
+}
+
+export function getArea(areaId: number): Area | null {
+  return db.prepare('SELECT * FROM areas WHERE id = ?').get(areaId) as Area | undefined || null;
+}
+
+function emptyAreaGoal(areaId: number): AreaGoal {
+  return {
+    areaId,
+    sixMonthGoal: '',
+    threeYearGoal: '',
+    focusPoints: '',
+    visionText: '',
+    visionImages: [],
+    updatedAt: '',
+  };
+}
+
+export function getAreaGoal(areaId: number): AreaGoal {
+  const row = db.prepare(`
+    SELECT area_id as areaId,
+           six_month_goal as sixMonthGoal,
+           three_year_goal as threeYearGoal,
+           focus_points as focusPoints,
+           vision_text as visionText,
+           vision_images as visionImages,
+           updated_at as updatedAt
+    FROM area_goals
+    WHERE area_id = ?
+  `).get(areaId) as (Omit<AreaGoal, 'visionImages'> & { visionImages: string }) | undefined;
+
+  if (!row) return emptyAreaGoal(areaId);
+  return { ...row, visionImages: parseImages(row.visionImages) };
+}
+
+export function updateAreaGoal(areaId: number, input: Omit<AreaGoal, 'areaId' | 'updatedAt'>): AreaGoal {
+  const areaIds = new Set<number>(LIFE_AREAS.map(area => area.id));
+  if (!areaIds.has(areaId)) {
+    throw new Error('Area must be one of the fixed life areas');
+  }
+
+  const visionImages = normalizeList(input.visionImages);
+  db.prepare(`
+    INSERT INTO area_goals (area_id, six_month_goal, three_year_goal, focus_points, vision_text, vision_images, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(area_id) DO UPDATE SET
+      six_month_goal = excluded.six_month_goal,
+      three_year_goal = excluded.three_year_goal,
+      focus_points = excluded.focus_points,
+      vision_text = excluded.vision_text,
+      vision_images = excluded.vision_images,
+      updated_at = CURRENT_TIMESTAMP
+  `).run(
+    areaId,
+    input.sixMonthGoal.trim(),
+    input.threeYearGoal.trim(),
+    input.focusPoints.trim(),
+    input.visionText.trim(),
+    JSON.stringify(visionImages),
+  );
+
+  return getAreaGoal(areaId);
 }
 
 export function getAreaEntries(areaId: number, year: number): Entry[] {
@@ -269,6 +366,79 @@ export function getSeeds() {
     lastDate: row.lastDate,
     commits: getCommits({ limit: 200 }).filter(commit => commit.seed === row.seed),
   }));
+}
+
+export function renameSeed(from: string, to: string) {
+  const source = from.trim();
+  const target = to.trim();
+  if (!source || !target) {
+    throw new Error('Seed names are required');
+  }
+  db.prepare('UPDATE commits SET seed = ? WHERE seed = ?').run(target, source);
+}
+
+export function deleteSeed(name: string) {
+  const seed = name.trim();
+  if (!seed) {
+    throw new Error('Seed name is required');
+  }
+  db.prepare("UPDATE commits SET seed = '' WHERE seed = ?").run(seed);
+}
+
+export function getTags() {
+  const commits = getCommits({ limit: 5000 });
+  const counts = new Map<string, { count: number; lastDate: string; commits: LifeCommit[] }>();
+
+  for (const commit of commits) {
+    for (const tag of commit.tags) {
+      const current = counts.get(tag) || { count: 0, lastDate: commit.date, commits: [] };
+      current.count += 1;
+      current.lastDate = current.lastDate > commit.date ? current.lastDate : commit.date;
+      current.commits.push(commit);
+      counts.set(tag, current);
+    }
+  }
+
+  return [...counts.entries()]
+    .map(([tag, data]) => ({ tag, ...data }))
+    .sort((a, b) => b.lastDate.localeCompare(a.lastDate) || b.count - a.count);
+}
+
+export function renameTag(from: string, to: string) {
+  const source = from.trim();
+  const target = to.trim();
+  if (!source || !target) {
+    throw new Error('Tag names are required');
+  }
+
+  const rows = db.prepare('SELECT id, tags FROM commits WHERE tags LIKE ?').all(`%${source}%`) as { id: number; tags: string }[];
+  const update = db.prepare('UPDATE commits SET tags = ? WHERE id = ?');
+  const transaction = db.transaction(() => {
+    for (const row of rows) {
+      const tags = parseTags(row.tags);
+      if (!tags.includes(source)) continue;
+      update.run(JSON.stringify(normalizeList(tags.map(tag => tag === source ? target : tag))), row.id);
+    }
+  });
+  transaction();
+}
+
+export function deleteTag(name: string) {
+  const target = name.trim();
+  if (!target) {
+    throw new Error('Tag name is required');
+  }
+
+  const rows = db.prepare('SELECT id, tags FROM commits WHERE tags LIKE ?').all(`%${target}%`) as { id: number; tags: string }[];
+  const update = db.prepare('UPDATE commits SET tags = ? WHERE id = ?');
+  const transaction = db.transaction(() => {
+    for (const row of rows) {
+      const tags = parseTags(row.tags);
+      if (!tags.includes(target)) continue;
+      update.run(JSON.stringify(tags.filter(tag => tag !== target)), row.id);
+    }
+  });
+  transaction();
 }
 
 export function getGratitudeEntries(date: string): GratitudeEntry[] {

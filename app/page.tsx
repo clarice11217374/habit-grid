@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import CommitForm from '@/components/CommitForm';
 import HabitGrid from '@/components/HabitGrid';
@@ -69,7 +70,50 @@ function CommitItem({ commit }: { commit: LifeCommit }) {
   );
 }
 
+function TodayProgress({ areas, todayCommits }: { areas: Area[]; todayCommits: LifeCommit[] }) {
+  const activeAreaIds = new Set(todayCommits.map(commit => commit.areaId));
+  const activeCount = activeAreaIds.size;
+  const percent = areas.length > 0 ? (activeCount / areas.length) * 100 : 0;
+
+  return (
+    <section className="bg-zinc-800/50 rounded-xl p-5 mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <h2 className="text-xl font-semibold">Today Progress</h2>
+        <span className="text-sm text-zinc-500">{activeCount} / {areas.length || 9} areas active today</span>
+      </div>
+      <div className="h-3 rounded-full bg-zinc-900/60 overflow-hidden mb-4">
+        <div
+          className="h-full rounded-full transition-all"
+          style={{
+            width: `${percent}%`,
+            background: 'linear-gradient(90deg, #22c55e, #3b82f6, #a855f7, #06b6d4)',
+          }}
+        />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {areas.map(area => {
+          const active = activeAreaIds.has(area.id);
+          return (
+            <span
+              key={area.id}
+              className="px-2.5 py-1 rounded-full text-sm border border-zinc-700/60"
+              style={{
+                backgroundColor: active ? `${area.color}22` : 'var(--card-soft)',
+                color: active ? area.color : 'var(--text-muted)',
+                borderColor: active ? `${area.color}55` : 'var(--border-color)',
+              }}
+            >
+              {area.name}
+            </span>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 export default function Home() {
+  const router = useRouter();
   const [areas, setAreas] = useState<Area[]>([]);
   const [activeArea, setActiveArea] = useState<number | null>(null);
   const [view, setView] = useState<'year' | 'month'>('year');
@@ -253,6 +297,8 @@ export default function Home() {
           </div>
         </div>
 
+        <TodayProgress areas={areas} todayCommits={todayCommits} />
+
         <CommitForm areas={areas} onCommit={handleCreateCommit} />
 
         <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -339,7 +385,7 @@ export default function Home() {
               color={area.color}
               year={year}
               entries={allEntries.filter(entry => entry.area_id === area.id)}
-              onClick={() => setActiveArea(area.id)}
+              onClick={() => router.push(`/goals/${area.id}`)}
             />
           ))}
         </div>

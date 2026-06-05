@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { deleteSeed, getSeeds, renameSeed } from '@/lib/db';
+import { deleteTag, getTags, renameTag } from '@/lib/db';
 
 export async function GET() {
-  return NextResponse.json(getSeeds());
+  return NextResponse.json(getTags());
 }
 
 export async function PATCH(request: NextRequest) {
@@ -11,10 +11,10 @@ export async function PATCH(request: NextRequest) {
   const to = typeof body.to === 'string' ? body.to : '';
 
   try {
-    renameSeed(from, to);
+    renameTag(from, to);
     return NextResponse.json({ ok: true });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to rename seed';
+    const message = error instanceof Error ? error.message : 'Failed to rename tag';
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }
@@ -23,10 +23,10 @@ export async function DELETE(request: NextRequest) {
   const name = request.nextUrl.searchParams.get('name') || '';
 
   try {
-    deleteSeed(name);
+    deleteTag(name);
     return NextResponse.json({ ok: true });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to delete seed';
+    const message = error instanceof Error ? error.message : 'Failed to delete tag';
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

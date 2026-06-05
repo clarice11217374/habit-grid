@@ -82,6 +82,14 @@ interface CommitFormProps {
   }) => Promise<void>;
 }
 
+interface Suggestion {
+  areaId: number;
+  areaName: string;
+  type: CommitType;
+  tags: string[];
+  seed: string;
+}
+
 export default function CommitForm({ areas, onCommit }: CommitFormProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -89,6 +97,9 @@ export default function CommitForm({ areas, onCommit }: CommitFormProps) {
   const [type, setType] = useState<CommitType>('Building');
   const [tags, setTags] = useState('');
   const [seed, setSeed] = useState('');
+  const [seedOptions, setSeedOptions] = useState<string[]>([]);
+  const [tagOptions, setTagOptions] = useState<string[]>([]);
+  const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -99,22 +110,54 @@ export default function CommitForm({ areas, onCommit }: CommitFormProps) {
   }, [areas, areaId]);
 
   useEffect(() => {
+    Promise.all([
+      fetch('/api/seeds').then(res => res.json()),
+      fetch('/api/tags').then(res => res.json()),
+    ]).then(([seedGroups, tagGroups]) => {
+      setSeedOptions(Array.isArray(seedGroups) ? seedGroups.map(group => group.seed).filter(Boolean) : []);
+      setTagOptions(Array.isArray(tagGroups) ? tagGroups.map(group => group.tag).filter(Boolean) : []);
+    }).catch(() => {
+      setSeedOptions([]);
+      setTagOptions([]);
+    });
+  }, []);
+
+  useEffect(() => {
     const text = `${title} ${description}`.toLowerCase();
-    if (!text.trim() || areas.length === 0) return;
+    if (!text.trim() || areas.length === 0) {
+      setSuggestion(null);
+      return;
+    }
 
     const rule = RECOMMENDATION_RULES.find(item =>
       item.keywords.some(keyword => text.includes(keyword.toLowerCase()))
     );
-    if (!rule) return;
+    if (!rule) {
+      setSuggestion(null);
+      return;
+    }
 
     const recommendedArea = areas.find(area => area.name === rule.area);
     if (recommendedArea) {
-      setAreaId(recommendedArea.id);
+      setSuggestion({
+        areaId: recommendedArea.id,
+        areaName: recommendedArea.name,
+        type: rule.type,
+        tags: rule.tags,
+        seed: rule.seed,
+      });
+    } else {
+      setSuggestion(null);
     }
-    setType(rule.type);
-    setTags(rule.tags.join(', '));
-    setSeed(rule.seed);
   }, [title, description, areas]);
+
+  const applySuggestion = () => {
+    if (!suggestion) return;
+    setAreaId(suggestion.areaId);
+    setType(suggestion.type);
+    setTags(suggestion.tags.join(', '));
+    setSeed(suggestion.seed);
+  };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -139,6 +182,13 @@ export default function CommitForm({ areas, onCommit }: CommitFormProps) {
       setDescription('');
       setTags('');
       setSeed('');
+      setSuggestion(null);
+      const [seedGroups, tagGroups] = await Promise.all([
+        fetch('/api/seeds').then(res => res.json()),
+        fetch('/api/tags').then(res => res.json()),
+      ]);
+      setSeedOptions(Array.isArray(seedGroups) ? seedGroups.map(group => group.seed).filter(Boolean) : []);
+      setTagOptions(Array.isArray(tagGroups) ? tagGroups.map(group => group.tag).filter(Boolean) : []);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to save commit');
     } finally {
@@ -148,6 +198,26 @@ export default function CommitForm({ areas, onCommit }: CommitFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="bg-zinc-800/50 rounded-xl p-5 mb-6">
+      {suggestion && (
+        <div className="mb-4 rounded-lg border border-zinc-700/60 bg-zinc-900/60 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-medium">Smart suggestion</div>
+              <div className="text-sm text-zinc-400">
+                {suggestion.areaName} / {suggestion.type} / {suggestion.tags.join(', ')} / Seed: {suggestion.seed}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={applySuggestion}
+              className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm transition-colors"
+            >
+              Apply suggestion
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px_180px] gap-4 mb-4">
         <div>
           <label className="block text-sm text-zinc-400 mb-2">Title</label>
@@ -201,18 +271,26 @@ export default function CommitForm({ areas, onCommit }: CommitFormProps) {
           <input
             value={tags}
             onChange={(event) => setTags(event.target.value)}
+            list="tag-options"
             placeholder="GitHub, React, Next.js"
             className="w-full px-4 py-2 bg-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-white/30"
           />
+          <datalist id="tag-options">
+            {tagOptions.map(tag => <option key={tag} value={tag} />)}
+          </datalist>
         </div>
         <div>
           <label className="block text-sm text-zinc-400 mb-2">Future Seed</label>
           <input
             value={seed}
             onChange={(event) => setSeed(event.target.value)}
+            list="seed-options"
             placeholder="Life Commit, career growth"
             className="w-full px-4 py-2 bg-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-white/30"
           />
+          <datalist id="seed-options">
+            {seedOptions.map(option => <option key={option} value={option} />)}
+          </datalist>
         </div>
       </div>
 

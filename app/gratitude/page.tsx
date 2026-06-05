@@ -13,12 +13,35 @@ function localDate() {
   return `${year}-${month}-${day}`;
 }
 
+function grammarSuggestion(value: string) {
+  let next = value;
+  const replacements: [RegExp, string][] = [
+    [/\bI am gratitude for\b/gi, 'I am grateful for'],
+    [/\bI gratitude for\b/gi, 'I am grateful for'],
+    [/\bI am thankful I\b/gi, 'I am thankful that I'],
+    [/\b(it|this|that) help me practice\b/gi, '$1 helps me practice'],
+    [/\bI cook myself\b/gi, 'I made myself'],
+    [/\barrive today\b/gi, 'arrived today'],
+    [/\bwork me up\b/gi, 'woke me up'],
+    [/\bit also help me\b/gi, 'it also helps me'],
+  ];
+
+  for (const [pattern, replacement] of replacements) {
+    next = next.replace(pattern, replacement);
+  }
+
+  return next.trim() && next !== value ? next : '';
+}
+
 export default function GratitudePage() {
   const [entries, setEntries] = useState<GratitudeEntry[]>([]);
   const [text, setText] = useState('');
+  const [dismissedSuggestion, setDismissedSuggestion] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const today = localDate();
+  const suggestion = grammarSuggestion(text);
+  const visibleSuggestion = suggestion && suggestion !== dismissedSuggestion ? suggestion : '';
 
   useEffect(() => {
     let cancelled = false;
@@ -59,6 +82,7 @@ export default function GratitudePage() {
         throw new Error(body.error || 'Failed to save gratitude');
       }
       setText('');
+      setDismissedSuggestion('');
       const nextEntries = await fetch(`/api/gratitude?date=${today}`);
       setEntries(await nextEntries.json());
     } catch (err: unknown) {
@@ -89,11 +113,39 @@ export default function GratitudePage() {
           </div>
           <textarea
             value={text}
-            onChange={(event) => setText(event.target.value)}
+            onChange={(event) => {
+              setText(event.target.value);
+              setDismissedSuggestion('');
+            }}
             rows={3}
             placeholder="I am grateful for..."
             className="w-full px-4 py-2 bg-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-white/30 resize-none"
           />
+          {visibleSuggestion && (
+            <div className="mt-3 rounded-lg border border-zinc-700/60 bg-zinc-900/60 p-4">
+              <div className="text-sm font-medium mb-1">Grammar suggestion:</div>
+              <p className="text-sm text-zinc-400 mb-3">{visibleSuggestion}</p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setText(visibleSuggestion);
+                    setDismissedSuggestion('');
+                  }}
+                  className="px-3 py-1.5 bg-white text-zinc-950 rounded-lg text-sm"
+                >
+                  Accept suggestion
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDismissedSuggestion(visibleSuggestion)}
+                  className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm"
+                >
+                  Keep original
+                </button>
+              </div>
+            </div>
+          )}
           {error && <div className="mt-3 text-sm text-red-400">{error}</div>}
           <button
             type="submit"
