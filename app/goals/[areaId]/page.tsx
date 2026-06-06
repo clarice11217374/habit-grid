@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import DashboardShell from '@/components/DashboardShell';
 import HabitGrid from '@/components/HabitGrid';
 import type { Area, AreaGoal, Entry, LifeCommit } from '@/lib/db';
+import { getAreaVisual } from '@/lib/constants';
 
 function localYear() {
   return new Date().getFullYear();
@@ -34,6 +35,7 @@ export default function GoalPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const areaVisual = getAreaVisual(areaId);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,17 +121,40 @@ export default function GoalPage() {
   return (
     <DashboardShell title={area?.name || 'Area Goal'} description="Goals, recent commits, and contribution history.">
       <div className="lc-grid">
-        <section className="bg-zinc-800/50 rounded-xl p-5 mb-6">
+        <section className="area-hero" style={{ backgroundImage: `url("${areaVisual.coverImage}")`, borderBottom: `3px solid ${area?.color || 'var(--border-color)'}` }}>
+          <div className="area-hero-content">
+            <span className="area-hero-emoji">{areaVisual.emoji}</span>
+            <div>
+              <h2>{area?.name || 'Area'}</h2>
+              <p>{entries.reduce((sum, entry) => sum + entry.count, 0)} commits recorded in {year}</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="lc-card lc-card-content">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-            <h2 className="text-xl font-semibold">Goal Section</h2>
-            <button
-              type="button"
-              onClick={saveGoal}
-              disabled={!goal || saving}
-              className="px-5 py-2 bg-white text-zinc-950 rounded-lg font-medium hover:bg-zinc-200 transition-colors disabled:opacity-50"
-            >
+            <h2 className="lc-section-title">Goals</h2>
+            <button type="button" onClick={saveGoal} disabled={!goal || saving} className="lc-button lc-button-primary">
               {saving ? 'Saving...' : 'Save Goals'}
             </button>
+          </div>
+          <div className="goal-summary-grid">
+            <article className="goal-summary-card">
+              <h3>6-month goal</h3>
+              <span className="goal-summary-status">{goal?.sixMonthGoal ? 'In Progress' : 'Not Set'}</span>
+              <p>{goal?.sixMonthGoal || 'Define the next meaningful milestone for this area.'}</p>
+            </article>
+            <article className="goal-summary-card">
+              <h3>3-year goal</h3>
+              <span className="goal-summary-status">{goal?.threeYearGoal ? 'In Progress' : 'Not Set'}</span>
+              <p>{goal?.threeYearGoal || 'Describe the longer-term direction for this area.'}</p>
+            </article>
+          </div>
+        </section>
+
+        <section className="lc-card lc-card-content">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <h2 className="lc-section-title">Goal details</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -204,15 +229,15 @@ export default function GoalPage() {
           </section>
         )}
 
-        <section className="bg-zinc-800/50 rounded-xl p-5 mb-6">
-          <h2 className="text-xl font-semibold mb-4">Recent commits under this area</h2>
+        <section className="lc-card lc-card-content">
+          <h2 className="lc-section-title mb-4">Recent commits under this area</h2>
           {commits.length === 0 ? <p className="text-zinc-400">No commits in this area yet</p> : commits.map(commit => <CommitRow key={commit.id} commit={commit} />)}
         </section>
 
-        <section className="bg-zinc-800/50 rounded-xl p-5">
+        <section className="lc-card lc-card-content">
           <div className="flex items-center gap-3 mb-4">
             <button onClick={() => setYear(value => value - 1)} className="p-2 hover:bg-zinc-800 rounded-lg transition-colors">‹</button>
-            <h2 className="text-xl font-semibold">{year}</h2>
+            <h2 className="lc-section-title">{year} contributions</h2>
             <button onClick={() => setYear(value => value + 1)} className="p-2 hover:bg-zinc-800 rounded-lg transition-colors">›</button>
           </div>
           {area && <HabitGrid habitId={area.id} color={area.color} view="year" year={year} month={0} entries={entries} />}

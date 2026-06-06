@@ -170,6 +170,7 @@ ensureColumn('commits', 'area_id', 'INTEGER');
 ensureColumn('commits', 'type', "TEXT NOT NULL DEFAULT 'Reflection'");
 ensureColumn('commits', 'tags', "TEXT NOT NULL DEFAULT '[]'");
 ensureColumn('commits', 'seed', "TEXT NOT NULL DEFAULT ''");
+ensureColumn('commit_impacts', 'impact_value', 'REAL NOT NULL DEFAULT 1');
 
 function syncFixedAreas() {
   const upsert = db.prepare(`

@@ -118,25 +118,25 @@ export default function SeedsPage() {
     <DashboardShell title="Seeds & Tags" description="Manage reusable labels and long-term value.">
       <div className="lc-grid">
 
-        <section className="bg-zinc-800/50 rounded-xl p-5 mb-6">
+        <section className="lc-card lc-card-content">
           <p className="text-zinc-300">
             Manage long-term seeds and reusable tags. Renaming updates related commits; deleting removes the reference from related commits.
           </p>
         </section>
 
-        {error && <div className="bg-zinc-800/50 rounded-xl p-4 mb-6 text-sm text-red-400">{error}</div>}
+        {error && <div className="lc-card lc-card-content text-sm text-red-400">{error}</div>}
 
-        <section className="space-y-4 mb-8">
-          <h2 className="text-2xl font-bold">Seed Manager</h2>
+        <section className="space-y-4">
+          <h2 className="lc-section-title">Seed Manager</h2>
           {seeds.length === 0 ? (
             <div className="bg-zinc-800/50 rounded-xl p-8 text-center text-zinc-400">
               Add a Future Seed when creating a commit to see it here.
             </div>
           ) : seeds.map(group => (
-            <section key={group.seed} className="bg-zinc-800/50 rounded-xl p-5">
+            <section key={group.seed} className="lc-card lc-card-content">
               <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <div>
-                  <h3 className="text-xl font-semibold">{group.seed}</h3>
+                  <h3 className="lc-item-title">{group.seed}</h3>
                   <p className="text-sm text-zinc-500">{group.count} commits - latest {group.lastDate}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -180,16 +180,16 @@ export default function SeedsPage() {
         </section>
 
         <section className="space-y-4">
-          <h2 className="text-2xl font-bold">Tag Manager</h2>
+          <h2 className="lc-section-title">Tag Manager</h2>
           {tags.length === 0 ? (
             <div className="bg-zinc-800/50 rounded-xl p-8 text-center text-zinc-400">
               Add tags when creating commits to manage them here.
             </div>
           ) : tags.map(group => (
-            <section key={group.tag} className="bg-zinc-800/50 rounded-xl p-5">
+            <section key={group.tag} className="lc-card lc-card-content">
               <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <div>
-                  <h3 className="text-xl font-semibold">{group.tag}</h3>
+                  <h3 className="lc-item-title">{group.tag}</h3>
                   <p className="text-sm text-zinc-500">{group.count} commits - latest {group.lastDate}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">

@@ -10,6 +10,7 @@ import MiniHabitGrid from '@/components/MiniHabitGrid';
 import ThemeToggle from '@/components/ThemeToggle';
 import ViewToggle from '@/components/ViewToggle';
 import type { Area, CommitType, DashboardStats, Entry, LifeCommit } from '@/lib/db';
+import { getAreaVisual } from '@/lib/constants';
 
 function localDate(date = new Date()) {
   const year = date.getFullYear();
@@ -394,6 +395,8 @@ export default function Home() {
               key={area.id}
               habitName={area.name}
               color={area.color}
+              emoji={getAreaVisual(area.id).emoji}
+              coverImage={getAreaVisual(area.id).coverImage}
               year={year}
               entries={allEntries.filter(entry => entry.area_id === area.id)}
               onClick={() => router.push(`/goals/${area.id}`)}

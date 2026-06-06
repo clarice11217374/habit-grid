@@ -7,6 +7,8 @@ import { heatmapColor, heatmapTooltip } from '@/lib/heatmap';
 interface MiniHabitGridProps {
   habitName: string;
   color: string;
+  emoji: string;
+  coverImage: string;
   year: number;
   entries: Entry[];
   onClick: () => void;
@@ -30,7 +32,7 @@ function getDaysInYear(year: number): Date[] {
   return days;
 }
 
-export default function MiniHabitGrid({ habitName, color, year, entries = [], onClick }: MiniHabitGridProps) {
+export default function MiniHabitGrid({ habitName, color, emoji, coverImage, year, entries = [], onClick }: MiniHabitGridProps) {
   const entryMap = useMemo(() => {
     const map = new Map<string, Pick<Entry, 'count' | 'titles'>>();
     entries.forEach(entry => map.set(entry.date, { count: entry.count, titles: entry.titles || [] }));
@@ -85,15 +87,19 @@ export default function MiniHabitGrid({ habitName, color, year, entries = [], on
   return (
     <div
       onClick={onClick}
-      className="lc-card p-4 hover:bg-zinc-800 transition-all cursor-pointer group"
+      className="lc-card area-card hover:bg-zinc-800 transition-all cursor-pointer group"
     >
+      <div className="area-card-cover" style={{ backgroundImage: `url("${coverImage}")` }}>
+        <span className="area-card-emoji">{emoji}</span>
+      </div>
+      <div className="area-card-body" style={{ borderTopColor: color }}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <div
             className="w-3 h-3 rounded-full"
             style={{ backgroundColor: color }}
           />
-          <h3 className="font-semibold text-lg">{habitName}</h3>
+          <h3 className="lc-section-title">{habitName}</h3>
         </div>
         <svg
           className="w-5 h-5 text-zinc-500 group-hover:text-white transition-colors"
@@ -138,6 +144,7 @@ export default function MiniHabitGrid({ habitName, color, year, entries = [], on
             {currentStreak} day streak
           </span>
         )}
+      </div>
       </div>
     </div>
   );
