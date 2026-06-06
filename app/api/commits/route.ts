@@ -17,12 +17,12 @@ function todayDate() {
 
 export async function GET(request: NextRequest) {
   try {
-    const { getCommits } = await import('@/lib/db');
+    const { getCommits } = await import('@/lib/data');
     const searchParams = request.nextUrl.searchParams;
     const date = searchParams.get('date') || undefined;
     const areaId = searchParams.get('area') ? Number(searchParams.get('area')) : undefined;
     const limit = searchParams.get('limit') ? Number(searchParams.get('limit')) : undefined;
-    return apiJson(getCommits({ date, areaId, limit }));
+    return apiJson(await getCommits({ date, areaId, limit }));
   } catch (error: unknown) {
     return apiError('/api/commits GET', error);
   }
@@ -57,8 +57,8 @@ export async function POST(request: NextRequest) {
       return apiJson({ error: 'Commit title is required' }, { status: 400 });
     }
 
-    const { createCommit } = await import('@/lib/db');
-    const commit = createCommit({ title, description, date, areaId, type, tags, seed });
+    const { createCommit } = await import('@/lib/data');
+    const commit = await createCommit({ title, description, date, areaId, type, tags, seed });
     return apiJson(commit, { status: 201 });
   } catch (error: unknown) {
     return apiError('/api/commits POST', error, 'Failed to create commit');

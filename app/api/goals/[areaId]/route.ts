@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { apiError, apiJson } from '@/lib/api';
-import { getArea, getAreaGoal, updateAreaGoal } from '@/lib/db';
+import { getArea, getAreaGoal, updateAreaGoal } from '@/lib/data';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -14,13 +14,13 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   try {
     const { areaId } = await context.params;
     const id = Number(areaId);
-    const area = getArea(id);
+    const area = await getArea(id);
 
     if (!area) {
       return apiJson({ error: 'Area not found' }, { status: 404 });
     }
 
-    return apiJson({ area, goal: getAreaGoal(id) });
+    return apiJson({ area, goal: await getAreaGoal(id) });
   } catch (error: unknown) {
     return apiError('/api/goals/[areaId] GET', error);
   }
@@ -37,7 +37,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
         ? body.visionImages.split('\n')
         : [];
 
-    const goal = updateAreaGoal(id, {
+    const goal = await updateAreaGoal(id, {
       sixMonthGoal: typeof body.sixMonthGoal === 'string' ? body.sixMonthGoal : '',
       threeYearGoal: typeof body.threeYearGoal === 'string' ? body.threeYearGoal : '',
       focusPoints: typeof body.focusPoints === 'string' ? body.focusPoints : '',

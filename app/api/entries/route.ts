@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { apiError, apiJson } from '@/lib/api';
-import { getAreaEntries, getAllAreaEntriesForYear } from '@/lib/db';
+import { getAreaEntries, getAllAreaEntriesForYear } from '@/lib/data';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,10 +13,10 @@ export async function GET(request: NextRequest) {
     const year = parseInt(searchParams.get('year') || new Date().getFullYear().toString());
 
     if (!areaId || areaId === 'all') {
-      return apiJson(getAllAreaEntriesForYear(year));
+      return apiJson(await getAllAreaEntriesForYear(year));
     }
 
-    return apiJson(getAreaEntries(parseInt(areaId), year));
+    return apiJson(await getAreaEntries(parseInt(areaId), year));
   } catch (error: unknown) {
     return apiError('/api/entries GET', error);
   }

@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { apiError, apiJson } from '@/lib/api';
-import { getAreas } from '@/lib/db';
+import { getAreas } from '@/lib/data';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -8,7 +8,7 @@ export const revalidate = 0;
 
 export async function GET() {
   try {
-    return apiJson(getAreas());
+    return apiJson(await getAreas());
   } catch (error: unknown) {
     return apiError('/api/habits GET', error);
   }
