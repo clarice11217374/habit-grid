@@ -49,13 +49,14 @@ export default function GoalPage() {
 
       if (goalRes.ok) {
         const body = await goalRes.json();
-        setArea(body.area);
-        setGoal(body.goal);
+        setArea(body?.area || null);
+        setGoal(body?.goal || null);
       } else {
         setError('Area not found');
       }
-      setEntries(await entriesRes.json());
-      setCommits(await commitsRes.json());
+      const [entriesData, commitsData] = await Promise.all([entriesRes.json(), commitsRes.json()]);
+      setEntries(Array.isArray(entriesData) ? entriesData : []);
+      setCommits(Array.isArray(commitsData) ? commitsData : []);
     }
 
     load();
@@ -98,13 +99,15 @@ export default function GoalPage() {
         throw new Error(body.error || 'Failed to save goal');
       }
 
-      setGoal(await res.json());
+      const goalData = await res.json();
+      setGoal(goalData && typeof goalData === 'object' && !Array.isArray(goalData) ? goalData : goal);
       const [entriesRes, commitsRes] = await Promise.all([
         fetch(`/api/entries?area=${areaId}&year=${year}`, { cache: 'no-store' }),
         fetch(`/api/commits?area=${areaId}&limit=20`, { cache: 'no-store' }),
       ]);
-      setEntries(await entriesRes.json());
-      setCommits(await commitsRes.json());
+      const [entriesData, commitsData] = await Promise.all([entriesRes.json(), commitsRes.json()]);
+      setEntries(Array.isArray(entriesData) ? entriesData : []);
+      setCommits(Array.isArray(commitsData) ? commitsData : []);
       setMessage('Saved');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to save goal');

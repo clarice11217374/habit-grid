@@ -93,8 +93,14 @@ export default function GratitudePage() {
       fetch(`/api/gratitude?date=${selectedDate}`, { cache: 'no-store' }),
       fetch('/api/gratitude?overview=1', { cache: 'no-store' }),
     ]);
-    setEntries(entriesRes.ok ? await entriesRes.json() : []);
-    setOverview(overviewRes.ok ? await overviewRes.json() : EMPTY_OVERVIEW);
+    const entriesData = entriesRes.ok ? await entriesRes.json() : [];
+    const overviewData = overviewRes.ok ? await overviewRes.json() : EMPTY_OVERVIEW;
+    setEntries(Array.isArray(entriesData) ? entriesData : []);
+    setOverview(
+      overviewData && typeof overviewData === 'object' && !Array.isArray(overviewData) && !('error' in overviewData)
+        ? { ...EMPTY_OVERVIEW, ...overviewData }
+        : EMPTY_OVERVIEW
+    );
   }, [selectedDate]);
 
   useEffect(() => {

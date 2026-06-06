@@ -89,7 +89,10 @@ export async function getCommits(options: { date?: string; areaId?: number; limi
   const impactMap = new Map<number, CommitImpact[]>();
   if (rows.length) {
     const impactsResult = await supabase.from('commit_impacts').select('commit_id,area_id,impact_value').eq('user_id', USER_ID).in('commit_id', rows.map(row => Number(row.id)));
-    for (const impact of assertData(impactsResult.data, impactsResult.error) as { commit_id: number; area_id: number; impact_value: number }[]) {
+    if (impactsResult.error) {
+      console.warn('[data] commit_impacts unavailable; falling back to commits.area_id', impactsResult.error.message);
+    }
+    for (const impact of (impactsResult.data || []) as { commit_id: number; area_id: number; impact_value: number }[]) {
       const area = areas.get(Number(impact.area_id));
       if (!area) continue;
       const mapped = { areaId: area.id, areaName: area.name, areaColor: area.color, impactValue: Number(impact.impact_value) };
@@ -155,7 +158,10 @@ async function entriesForYear(year: number, areaId?: number): Promise<Entry[]> {
     ? await supabase.from('commit_impacts').select('commit_id,area_id').eq('user_id', USER_ID).in('commit_id', rows.map(row => row.id))
     : { data: [], error: null };
   const impactsByCommit = new Map<number, number[]>();
-  for (const impact of assertData(impactResult.data, impactResult.error) as { commit_id: number; area_id: number }[]) {
+  if (impactResult.error) {
+    console.warn('[data] commit_impacts unavailable for entries; falling back to commits.area_id', impactResult.error.message);
+  }
+  for (const impact of (impactResult.data || []) as { commit_id: number; area_id: number }[]) {
     impactsByCommit.set(impact.commit_id, [...(impactsByCommit.get(impact.commit_id) || []), impact.area_id]);
   }
   const groups = new Map<string, Entry>();

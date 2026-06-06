@@ -30,7 +30,7 @@ function getDaysInYear(year: number): Date[] {
   return days;
 }
 
-export default function MiniHabitGrid({ habitName, color, year, entries, onClick }: MiniHabitGridProps) {
+export default function MiniHabitGrid({ habitName, color, year, entries = [], onClick }: MiniHabitGridProps) {
   const entryMap = useMemo(() => {
     const map = new Map<string, Pick<Entry, 'count' | 'titles'>>();
     entries.forEach(entry => map.set(entry.date, { count: entry.count, titles: entry.titles || [] }));

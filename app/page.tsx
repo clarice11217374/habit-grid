@@ -51,21 +51,29 @@ function Recent30Heatmap({ days }: { days: { date: string; count: number }[] }) 
   );
 }
 
+function commitImpacts(commit: LifeCommit) {
+  if (Array.isArray(commit.impactAreas) && commit.impactAreas.length) return commit.impactAreas;
+  if (commit.areaId && commit.areaName) {
+    return [{ areaId: commit.areaId, areaName: commit.areaName, areaColor: commit.areaColor || 'var(--text-muted)', impactValue: 1 }];
+  }
+  return [];
+}
+
 function CommitItem({ commit }: { commit: LifeCommit }) {
   return (
     <div className="border-b border-zinc-700/60 last:border-b-0 py-3 first:pt-0 last:pb-0">
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-medium">{commit.title}</span>
         <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-700 text-zinc-300">{commit.type}</span>
-        {commit.impactAreas.map(impact => (
+        {commitImpacts(commit).map(impact => (
           <span key={impact.areaId} className="text-sm" style={{ color: impact.areaColor }}>{impact.areaName}</span>
         ))}
         <span className="text-sm text-zinc-500">{commit.date}</span>
       </div>
       {commit.description && <p className="text-sm text-zinc-400 mt-1">{commit.description}</p>}
-      {(commit.tags.length > 0 || commit.seed) && (
+      {((commit.tags?.length || 0) > 0 || commit.seed) && (
         <div className="flex flex-wrap gap-2 mt-2 text-xs text-zinc-400">
-          {commit.tags.map(tag => <span key={tag} className="px-2 py-1 rounded bg-zinc-900/70">{tag}</span>)}
+          {(commit.tags || []).map(tag => <span key={tag} className="px-2 py-1 rounded bg-zinc-900/70">{tag}</span>)}
           {commit.seed && <span className="px-2 py-1 rounded bg-zinc-900/70">Seed: {commit.seed}</span>}
         </div>
       )}
@@ -74,7 +82,7 @@ function CommitItem({ commit }: { commit: LifeCommit }) {
 }
 
 function TodayProgress({ areas, todayCommits }: { areas: Area[]; todayCommits: LifeCommit[] }) {
-  const activeAreaIds = new Set(todayCommits.flatMap(commit => commit.impactAreas.map(impact => impact.areaId)));
+  const activeAreaIds = new Set(todayCommits.flatMap(commit => commitImpacts(commit).map(impact => impact.areaId)));
   const commitCount = todayCommits.length;
   const percent = Math.min(100, (commitCount / 10) * 100);
 
@@ -139,11 +147,14 @@ export default function Home() {
       fetch('/api/commits?limit=30', { cache: 'no-store' }),
       fetch('/api/dashboard', { cache: 'no-store' }),
     ]);
-    setAreas(await areasRes.json());
-    setAllEntries(await entriesRes.json());
-    setTodayCommits(await todayRes.json());
-    setRecentCommits(await recentRes.json());
-    setDashboard(await dashboardRes.json());
+    const [areasData, entriesData, todayData, recentData, dashboardData] = await Promise.all([
+      areasRes.json(), entriesRes.json(), todayRes.json(), recentRes.json(), dashboardRes.json(),
+    ]);
+    setAreas(Array.isArray(areasData) ? areasData : []);
+    setAllEntries(Array.isArray(entriesData) ? entriesData : []);
+    setTodayCommits(Array.isArray(todayData) ? todayData : []);
+    setRecentCommits(Array.isArray(recentData) ? recentData : []);
+    setDashboard(dashboardData && typeof dashboardData === 'object' && !Array.isArray(dashboardData) && !('error' in dashboardData) ? dashboardData : null);
   }
 
   useEffect(() => {
@@ -159,11 +170,14 @@ export default function Home() {
       ]);
 
       if (!cancelled) {
-        setAreas(await areasRes.json());
-        setAllEntries(await entriesRes.json());
-        setTodayCommits(await todayRes.json());
-        setRecentCommits(await recentRes.json());
-        setDashboard(await dashboardRes.json());
+        const [areasData, entriesData, todayData, recentData, dashboardData] = await Promise.all([
+          areasRes.json(), entriesRes.json(), todayRes.json(), recentRes.json(), dashboardRes.json(),
+        ]);
+        setAreas(Array.isArray(areasData) ? areasData : []);
+        setAllEntries(Array.isArray(entriesData) ? entriesData : []);
+        setTodayCommits(Array.isArray(todayData) ? todayData : []);
+        setRecentCommits(Array.isArray(recentData) ? recentData : []);
+        setDashboard(dashboardData && typeof dashboardData === 'object' && !Array.isArray(dashboardData) && !('error' in dashboardData) ? dashboardData : null);
       }
     }
 
@@ -180,8 +194,9 @@ export default function Home() {
         fetch(`/api/entries?area=${activeArea}&year=${year}`, { cache: 'no-store' }),
         fetch(`/api/commits?area=${activeArea}&limit=20`, { cache: 'no-store' }),
       ]).then(async ([entriesRes, commitsRes]) => {
-        setAreaEntries(await entriesRes.json());
-        setRecentCommits(await commitsRes.json());
+        const [entriesData, commitsData] = await Promise.all([entriesRes.json(), commitsRes.json()]);
+        setAreaEntries(Array.isArray(entriesData) ? entriesData : []);
+        setRecentCommits(Array.isArray(commitsData) ? commitsData : []);
       });
     }
   }, [activeArea, year]);
@@ -345,13 +360,13 @@ export default function Home() {
           <div className="lc-card p-5">
             <h2 className="text-xl font-semibold mb-4">Top Tags</h2>
             <div className="flex flex-wrap gap-2">
-              {(dashboard?.topTags.length ? dashboard.topTags : []).map(tag => <span key={tag.name} className="px-2 py-1 rounded bg-zinc-900/70 text-sm">{tag.name} · {tag.count}</span>)}
+              {(dashboard?.topTags || []).map(tag => <span key={tag.name} className="px-2 py-1 rounded bg-zinc-900/70 text-sm">{tag.name} · {tag.count}</span>)}
             </div>
           </div>
           <div className="lc-card p-5">
             <h2 className="text-xl font-semibold mb-4">Top Seeds</h2>
             <div className="flex flex-wrap gap-2">
-              {(dashboard?.topSeeds.length ? dashboard.topSeeds : []).map(seed => <span key={seed.name} className="px-2 py-1 rounded bg-zinc-900/70 text-sm">{seed.name} · {seed.count}</span>)}
+              {(dashboard?.topSeeds || []).map(seed => <span key={seed.name} className="px-2 py-1 rounded bg-zinc-900/70 text-sm">{seed.name} · {seed.count}</span>)}
             </div>
           </div>
         </section>

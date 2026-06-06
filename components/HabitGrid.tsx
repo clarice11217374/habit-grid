@@ -45,7 +45,7 @@ function getDaysInMonth(year: number, month: number): Date[] {
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-export default function HabitGrid({ color, view, year, month, entries }: HabitGridProps) {
+export default function HabitGrid({ color, view, year, month, entries = [] }: HabitGridProps) {
   const entryMap = useMemo(() => {
     const map = new Map<string, Pick<Entry, 'count' | 'titles'>>();
     entries.forEach(entry => map.set(entry.date, { count: entry.count, titles: entry.titles || [] }));

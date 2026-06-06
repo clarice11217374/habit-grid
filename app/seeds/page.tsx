@@ -31,8 +31,9 @@ export default function SeedsPage() {
       fetch('/api/seeds', { cache: 'no-store' }),
       fetch('/api/tags', { cache: 'no-store' }),
     ]);
-    setSeeds(await seedRes.json());
-    setTags(await tagRes.json());
+    const [seedData, tagData] = await Promise.all([seedRes.json(), tagRes.json()]);
+    setSeeds(Array.isArray(seedData) ? seedData : []);
+    setTags(Array.isArray(tagData) ? tagData : []);
   }
 
   useEffect(() => {
@@ -163,7 +164,10 @@ export default function SeedsPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-zinc-500">{commit.date}</span>
                       <span className="font-medium">{commit.title}</span>
-                      {commit.impactAreas.map(impact => (
+                      {(Array.isArray(commit.impactAreas) && commit.impactAreas.length
+                        ? commit.impactAreas
+                        : [{ areaId: commit.areaId, areaName: commit.areaName, areaColor: commit.areaColor, impactValue: 1 }]
+                      ).map(impact => (
                         <span key={impact.areaId} className="text-sm" style={{ color: impact.areaColor }}>{impact.areaName}</span>
                       ))}
                     </div>
