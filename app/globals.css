@@ -109,10 +109,11 @@ button, input, textarea, select { font: inherit; }
 .dashboard-content p { line-height: 1.55; }
 .dashboard-content .bg-zinc-800\/50 { padding: 18px !important; border-radius: 8px !important; }
 .area-card { overflow: hidden; }
-.area-card-cover { position: relative; height: 76px; background-position: center; background-size: cover; }
+.area-card-cover { position: relative; height: 54px; background-position: center; background-size: cover; }
 .area-card-cover::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,.02), rgba(0,0,0,.28)); }
-.area-card-emoji { position: absolute; z-index: 1; left: 14px; bottom: 10px; display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid rgba(255,255,255,.7); border-radius: 7px; background: rgba(255,255,255,.9); font-size: 17px; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
-.area-card-body { padding: 14px 16px 16px; border-top: 3px solid transparent; }
+.area-card-emoji { position: absolute; z-index: 1; left: 12px; bottom: 7px; display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid rgba(255,255,255,.7); border-radius: 6px; background: rgba(255,255,255,.9); font-size: 15px; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+.area-card-body { padding: 10px 12px 12px; border-top: 2px solid transparent; }
+.area-mini-heatmap { display: grid; grid-template-columns: repeat(53, minmax(0, 1fr)); gap: 1px; width: 100%; }
 .area-hero { position: relative; min-height: 178px; overflow: hidden; border-radius: 8px; background-position: center; background-size: cover; }
 .area-hero::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(15,18,22,.78), rgba(15,18,22,.05)); }
 .area-hero-content { position: absolute; z-index: 1; left: 20px; right: 20px; bottom: 18px; display: flex; align-items: center; gap: 12px; color: #fff; }

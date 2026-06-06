@@ -93,7 +93,7 @@ export default function MiniHabitGrid({ habitName, color, emoji, coverImage, yea
         <span className="area-card-emoji">{emoji}</span>
       </div>
       <div className="area-card-body" style={{ borderTopColor: color }}>
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <div
             className="w-3 h-3 rounded-full"
@@ -111,10 +111,10 @@ export default function MiniHabitGrid({ habitName, color, emoji, coverImage, yea
         </svg>
       </div>
 
-      <div className="overflow-hidden mb-3">
-        <div className="flex gap-[2px]">
+      <div className="overflow-hidden mb-2">
+        <div className="area-mini-heatmap">
           {weeks.map((week, weekIndex) => (
-            <div key={weekIndex} className="flex flex-col gap-[2px]">
+            <div key={weekIndex} className="flex min-w-0 flex-col gap-[1px]">
               {week.map((day, dayIndex) => {
                 const date = day ? formatDate(day) : '';
                 const entry = date ? entryMap.get(date) : undefined;
@@ -122,7 +122,7 @@ export default function MiniHabitGrid({ habitName, color, emoji, coverImage, yea
                 return (
                   <div
                     key={dayIndex}
-                    className="w-[8px] h-[8px] rounded-[2px]"
+                    className="aspect-square w-full rounded-[1px]"
                     style={{
                       backgroundColor: !day ? 'transparent' : heatmapColor(color, count),
                     }}
@@ -135,7 +135,7 @@ export default function MiniHabitGrid({ habitName, color, emoji, coverImage, yea
         </div>
       </div>
 
-      <div className="flex items-center justify-between text-sm">
+      <div className="flex items-center justify-between text-xs">
         <span className="text-zinc-400">
           {totalCommits} commits · {activeDays} days
         </span>
