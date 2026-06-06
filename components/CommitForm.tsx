@@ -75,7 +75,7 @@ interface CommitFormProps {
   onCommit: (input: {
     title: string;
     description: string;
-    areaId: number;
+    impactAreas: string[];
     type: CommitType;
     tags: string[];
     seed: string;
@@ -93,7 +93,7 @@ interface Suggestion {
 export default function CommitForm({ areas, onCommit }: CommitFormProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [areaId, setAreaId] = useState(areas[0]?.id ?? 1);
+  const [impactAreaIds, setImpactAreaIds] = useState<number[]>([]);
   const [type, setType] = useState<CommitType>('Building');
   const [tags, setTags] = useState('');
   const [seed, setSeed] = useState('');
@@ -102,12 +102,6 @@ export default function CommitForm({ areas, onCommit }: CommitFormProps) {
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (areas.length > 0 && !areas.some(area => area.id === areaId)) {
-      setAreaId(areas[0].id);
-    }
-  }, [areas, areaId]);
 
   useEffect(() => {
     Promise.all([
@@ -153,7 +147,7 @@ export default function CommitForm({ areas, onCommit }: CommitFormProps) {
 
   const applySuggestion = () => {
     if (!suggestion) return;
-    setAreaId(suggestion.areaId);
+    setImpactAreaIds(current => current.includes(suggestion.areaId) ? current : [...current, suggestion.areaId]);
     setType(suggestion.type);
     setTags(suggestion.tags.join(', '));
     setSeed(suggestion.seed);
@@ -167,13 +161,17 @@ export default function CommitForm({ areas, onCommit }: CommitFormProps) {
       setError('Title is required');
       return;
     }
+    if (!impactAreaIds.length) {
+      setError('Select at least one impact area.');
+      return;
+    }
 
     setLoading(true);
     try {
       await onCommit({
         title: title.trim(),
         description: description.trim(),
-        areaId,
+        impactAreas: areas.filter(area => impactAreaIds.includes(area.id)).map(area => area.name),
         type,
         tags: tags.split(',').map(tag => tag.trim()).filter(Boolean),
         seed: seed.trim(),
@@ -182,6 +180,7 @@ export default function CommitForm({ areas, onCommit }: CommitFormProps) {
       setDescription('');
       setTags('');
       setSeed('');
+      setImpactAreaIds([]);
       setSuggestion(null);
       const [seedGroups, tagGroups] = await Promise.all([
         fetch('/api/seeds', { cache: 'no-store' }).then(res => res.json()),
@@ -218,7 +217,7 @@ export default function CommitForm({ areas, onCommit }: CommitFormProps) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px_180px] gap-4 mb-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-4 mb-4">
         <div>
           <label className="block text-sm text-zinc-400 mb-2">Title</label>
           <input
@@ -227,18 +226,6 @@ export default function CommitForm({ areas, onCommit }: CommitFormProps) {
             placeholder="Forked my first GitHub project"
             className="w-full px-4 py-2 bg-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-white/30"
           />
-        </div>
-        <div>
-          <label className="block text-sm text-zinc-400 mb-2">Area</label>
-          <select
-            value={areaId}
-            onChange={(event) => setAreaId(Number(event.target.value))}
-            className="w-full px-4 py-2 bg-zinc-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-white/30"
-          >
-            {areas.map(area => (
-              <option key={area.id} value={area.id}>{area.name}</option>
-            ))}
-          </select>
         </div>
         <div>
           <label className="block text-sm text-zinc-400 mb-2">Type</label>
@@ -252,6 +239,32 @@ export default function CommitForm({ areas, onCommit }: CommitFormProps) {
             ))}
           </select>
         </div>
+      </div>
+
+      <div className="mb-4">
+        <label className="block text-sm text-zinc-400 mb-2">Impact Areas</label>
+        <div className="flex flex-wrap gap-2">
+          {areas.map(area => {
+            const selected = impactAreaIds.includes(area.id);
+            return (
+              <button
+                key={area.id}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => setImpactAreaIds(current => selected ? current.filter(id => id !== area.id) : [...current, area.id])}
+                className="px-3 py-1.5 rounded-full border text-sm transition-colors"
+                style={{
+                  color: selected ? area.color : 'var(--text-muted)',
+                  borderColor: selected ? area.color : 'var(--border-color)',
+                  backgroundColor: selected ? `${area.color}22` : 'var(--card-soft)',
+                }}
+              >
+                {area.name}
+              </button>
+            );
+          })}
+        </div>
+        {!impactAreaIds.length && <p className="mt-2 text-sm text-zinc-500">Select at least one impact area.</p>}
       </div>
 
       <div className="mb-4">
@@ -298,7 +311,7 @@ export default function CommitForm({ areas, onCommit }: CommitFormProps) {
 
       <button
         type="submit"
-        disabled={loading}
+        disabled={loading || impactAreaIds.length === 0}
         className="px-5 py-2 bg-white text-zinc-950 rounded-lg font-medium hover:bg-zinc-200 transition-colors disabled:opacity-50"
       >
         {loading ? 'Saving...' : 'Save Commit'}

@@ -174,7 +174,9 @@ export default function SeedsPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-zinc-500">{commit.date}</span>
                       <span className="font-medium">{commit.title}</span>
-                      <span className="text-sm" style={{ color: commit.areaColor }}>{commit.areaName}</span>
+                      {commit.impactAreas.map(impact => (
+                        <span key={impact.areaId} className="text-sm" style={{ color: impact.areaColor }}>{impact.areaName}</span>
+                      ))}
                     </div>
                     {commit.description && <p className="text-sm text-zinc-400 mt-1">{commit.description}</p>}
                   </div>

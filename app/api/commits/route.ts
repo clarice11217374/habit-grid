@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
       description: body?.description,
       date: body?.date,
       areaId: body?.areaId,
+      impactAreas: body?.impactAreas,
       type: body?.type,
       tags: body?.tags,
       seed: body?.seed,
@@ -44,7 +45,9 @@ export async function POST(request: NextRequest) {
     const title = typeof body.title === 'string' ? body.title.trim() : '';
     const description = typeof body.description === 'string' ? body.description.trim() : '';
     const date = typeof body.date === 'string' && body.date ? body.date : todayDate();
-    const areaId = Number(body.areaId);
+    const impactAreaNames: string[] = Array.isArray(body.impactAreas)
+      ? body.impactAreas.filter((area: unknown) => typeof area === 'string').map((area: string) => area.trim()).filter(Boolean)
+      : [];
     const type = COMMIT_TYPES.includes(body.type) ? body.type as CommitType : 'Reflection';
     const tags = Array.isArray(body.tags)
       ? body.tags.filter((tag: unknown) => typeof tag === 'string')
@@ -57,8 +60,18 @@ export async function POST(request: NextRequest) {
       return apiJson({ error: 'Commit title is required' }, { status: 400 });
     }
 
-    const { createCommit } = await import('@/lib/data');
-    const commit = await createCommit({ title, description, date, areaId, type, tags, seed });
+    const { createCommit, getAreas } = await import('@/lib/data');
+    const areas = await getAreas();
+    const legacyAreaId = Number(body.areaId);
+    const impactAreaIds = [...new Set(
+      impactAreaNames.length
+        ? impactAreaNames.map(name => areas.find(area => area.name === name)?.id).filter((id): id is number => Boolean(id))
+        : areas.some(area => area.id === legacyAreaId) ? [legacyAreaId] : []
+    )];
+    if (!impactAreaIds.length) {
+      return apiJson({ error: 'Select at least one impact area' }, { status: 400 });
+    }
+    const commit = await createCommit({ title, description, date, areaId: impactAreaIds[0], impactAreaIds, type, tags, seed });
     return apiJson(commit, { status: 201 });
   } catch (error: unknown) {
     return apiError('/api/commits POST', error, 'Failed to create commit');

@@ -24,6 +24,13 @@ export interface Area {
 
 export type Habit = Area;
 
+export interface CommitImpact {
+  areaId: number;
+  areaName: string;
+  areaColor: string;
+  impactValue: number;
+}
+
 export interface Entry {
   id: number;
   area_id: number;
@@ -41,6 +48,7 @@ export interface LifeCommit {
   areaId: number;
   areaName: string;
   areaColor: string;
+  impactAreas: CommitImpact[];
   type: CommitType;
   tags: string[];
   seed: string;
@@ -78,7 +86,8 @@ export interface CreateCommitInput {
   title: string;
   description: string;
   date: string;
-  areaId: number;
+  areaId?: number;
+  impactAreaIds: number[];
   type: CommitType;
   tags: string[];
   seed: string;
@@ -121,6 +130,16 @@ db.exec(`
     date TEXT NOT NULL,
     text TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS commit_impacts (
+    id INTEGER PRIMARY KEY,
+    commit_id INTEGER NOT NULL,
+    area_id INTEGER NOT NULL,
+    impact_value REAL NOT NULL DEFAULT 1,
+    UNIQUE(commit_id, area_id),
+    FOREIGN KEY (commit_id) REFERENCES commits(id) ON DELETE CASCADE,
+    FOREIGN KEY (area_id) REFERENCES areas(id)
   );
 
   CREATE TABLE IF NOT EXISTS area_goals (
@@ -179,6 +198,11 @@ db.prepare(`
   WHERE area_id IS NULL OR description = ''
 `).run();
 
+db.prepare(`
+  INSERT OR IGNORE INTO commit_impacts (commit_id, area_id, impact_value)
+  SELECT id, area_id, 1 FROM commits WHERE area_id IS NOT NULL
+`).run();
+
 function parseTags(value: string | null): string[] {
   if (!value) return [];
   try {
@@ -203,7 +227,7 @@ function parseImages(value: string | null): string[] {
   }
 }
 
-function toCommit(row: {
+type CommitRow = {
   id: number;
   title: string;
   description: string;
@@ -215,16 +239,26 @@ function toCommit(row: {
   tags: string;
   seed: string;
   created_at: string;
-}): LifeCommit {
+};
+
+function toCommit(row: CommitRow, impacts: CommitImpact[]): LifeCommit {
   const type = COMMIT_TYPES.includes(row.type as CommitType) ? row.type as CommitType : 'Reflection';
+  const fallbackImpact = {
+    areaId: row.area_id,
+    areaName: row.area_name,
+    areaColor: row.area_color,
+    impactValue: 1,
+  };
+  const resolvedImpacts = impacts.length ? impacts : [fallbackImpact];
   return {
     id: row.id,
     title: row.title,
     description: row.description,
     date: row.date,
-    areaId: row.area_id,
-    areaName: row.area_name,
-    areaColor: row.area_color,
+    areaId: resolvedImpacts[0].areaId,
+    areaName: resolvedImpacts[0].areaName,
+    areaColor: resolvedImpacts[0].areaColor,
+    impactAreas: resolvedImpacts,
     type,
     tags: parseTags(row.tags),
     seed: row.seed,
@@ -312,10 +346,11 @@ export function getAreaEntries(areaId: number, year: number): Entry[] {
   const startDate = `${year}-01-01`;
   const endDate = `${year}-12-31`;
   const rows = db.prepare(`
-    SELECT MIN(id) as id, area_id, date, COUNT(*) as count, 1 as completed, json_group_array(title) as titles
-    FROM commits
-    WHERE area_id = ? AND date >= ? AND date <= ?
-    GROUP BY area_id, date
+    SELECT MIN(c.id) as id, ci.area_id, c.date, COUNT(*) as count, 1 as completed, json_group_array(c.title) as titles
+    FROM commit_impacts ci
+    JOIN commits c ON c.id = ci.commit_id
+    WHERE ci.area_id = ? AND c.date >= ? AND c.date <= ?
+    GROUP BY ci.area_id, c.date
     ORDER BY date
   `).all(areaId, startDate, endDate) as (Omit<Entry, 'titles'> & { titles: string })[];
   return rows.map(row => ({ ...row, titles: parseTags(row.titles) }));
@@ -325,10 +360,11 @@ export function getAllAreaEntriesForYear(year: number): Entry[] {
   const startDate = `${year}-01-01`;
   const endDate = `${year}-12-31`;
   const rows = db.prepare(`
-    SELECT MIN(id) as id, area_id, date, COUNT(*) as count, 1 as completed, json_group_array(title) as titles
-    FROM commits
-    WHERE date >= ? AND date <= ?
-    GROUP BY area_id, date
+    SELECT MIN(c.id) as id, ci.area_id, c.date, COUNT(*) as count, 1 as completed, json_group_array(c.title) as titles
+    FROM commit_impacts ci
+    JOIN commits c ON c.id = ci.commit_id
+    WHERE c.date >= ? AND c.date <= ?
+    GROUP BY ci.area_id, c.date
     ORDER BY date
   `).all(startDate, endDate) as (Omit<Entry, 'titles'> & { titles: string })[];
   return rows.map(row => ({ ...row, titles: parseTags(row.titles) }));
@@ -343,36 +379,55 @@ export function getCommits(options: { date?: string; areaId?: number; limit?: nu
     params.push(options.date);
   }
   if (options.areaId) {
-    clauses.push('c.area_id = ?');
+    clauses.push('EXISTS (SELECT 1 FROM commit_impacts ci WHERE ci.commit_id = c.id AND ci.area_id = ?)');
     params.push(options.areaId);
   }
 
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
   const limit = options.limit ? `LIMIT ${options.limit}` : '';
-  const rows = db.prepare(`${commitSelect(where)} ORDER BY c.date DESC, c.created_at DESC, c.id DESC ${limit}`).all(...params) as Parameters<typeof toCommit>[0][];
-  return rows.map(toCommit);
+  const rows = db.prepare(`${commitSelect(where)} ORDER BY c.date DESC, c.created_at DESC, c.id DESC ${limit}`).all(...params) as CommitRow[];
+  if (!rows.length) return [];
+  const placeholders = rows.map(() => '?').join(',');
+  const impactRows = db.prepare(`
+    SELECT ci.commit_id, ci.area_id as areaId, a.name as areaName, a.color as areaColor, ci.impact_value as impactValue
+    FROM commit_impacts ci
+    JOIN areas a ON a.id = ci.area_id
+    WHERE ci.commit_id IN (${placeholders})
+    ORDER BY ci.id
+  `).all(...rows.map(row => row.id)) as (CommitImpact & { commit_id: number })[];
+  const impactMap = new Map<number, CommitImpact[]>();
+  for (const impact of impactRows) {
+    impactMap.set(impact.commit_id, [...(impactMap.get(impact.commit_id) || []), impact]);
+  }
+  return rows.map(row => toCommit(row, impactMap.get(row.id) || []));
 }
 
 export function createCommit(input: CreateCommitInput): LifeCommit {
   const areaIds = new Set<number>(LIFE_AREAS.map(area => area.id));
-  if (!areaIds.has(input.areaId)) {
-    throw new Error('Area must be one of the fixed life areas');
+  const impactAreaIds = [...new Set(input.impactAreaIds)];
+  if (!impactAreaIds.length || impactAreaIds.some(areaId => !areaIds.has(areaId))) {
+    throw new Error('Select at least one valid impact area');
   }
   if (!COMMIT_TYPES.includes(input.type)) {
     throw new Error('Commit type is not supported');
   }
 
   const tags = input.tags.map(tag => tag.trim()).filter(Boolean);
-  const result = db.prepare(`
+  const primaryAreaId = input.areaId && impactAreaIds.includes(input.areaId) ? input.areaId : impactAreaIds[0];
+  const insertCommit = db.prepare(`
     INSERT INTO commits (title, description, date, area_id, type, tags, seed, duration, note, primary_area_id)
     VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, ?)
-  `).run(input.title, input.description, input.date, input.areaId, input.type, JSON.stringify(tags), input.seed, input.description, input.areaId);
-
-  const row = db.prepare(`${commitSelect('WHERE c.id = ?')} LIMIT 1`).get(Number(result.lastInsertRowid)) as Parameters<typeof toCommit>[0] | undefined;
-  if (!row) {
-    throw new Error('Commit was saved but could not be read back');
-  }
-  return toCommit(row);
+  `);
+  const insertImpact = db.prepare('INSERT INTO commit_impacts (commit_id, area_id, impact_value) VALUES (?, ?, 1)');
+  const commitId = db.transaction(() => {
+    const result = insertCommit.run(input.title, input.description, input.date, primaryAreaId, input.type, JSON.stringify(tags), input.seed, input.description, primaryAreaId);
+    const id = Number(result.lastInsertRowid);
+    for (const areaId of impactAreaIds) insertImpact.run(id, areaId);
+    return id;
+  })();
+  const commit = getCommits({ limit: 5000 }).find(item => item.id === commitId);
+  if (!commit) throw new Error('Commit was saved but could not be read back');
+  return commit;
 }
 
 export function getSeeds() {
@@ -589,9 +644,9 @@ export function getDashboardStats(): DashboardStats {
   }
 
   const areaDistribution = db.prepare(`
-    SELECT a.id as areaId, a.name as areaName, a.color, COUNT(c.id) as count
+    SELECT a.id as areaId, a.name as areaName, a.color, COUNT(ci.commit_id) as count
     FROM areas a
-    LEFT JOIN commits c ON c.area_id = a.id
+    LEFT JOIN commit_impacts ci ON ci.area_id = a.id
     GROUP BY a.id
     ORDER BY a.id
   `).all() as DashboardStats['areaDistribution'];

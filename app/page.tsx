@@ -56,7 +56,9 @@ function CommitItem({ commit }: { commit: LifeCommit }) {
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-medium">{commit.title}</span>
         <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-700 text-zinc-300">{commit.type}</span>
-        <span className="text-sm" style={{ color: commit.areaColor }}>{commit.areaName}</span>
+        {commit.impactAreas.map(impact => (
+          <span key={impact.areaId} className="text-sm" style={{ color: impact.areaColor }}>{impact.areaName}</span>
+        ))}
         <span className="text-sm text-zinc-500">{commit.date}</span>
       </div>
       {commit.description && <p className="text-sm text-zinc-400 mt-1">{commit.description}</p>}
@@ -71,7 +73,7 @@ function CommitItem({ commit }: { commit: LifeCommit }) {
 }
 
 function TodayProgress({ areas, todayCommits }: { areas: Area[]; todayCommits: LifeCommit[] }) {
-  const activeAreaIds = new Set(todayCommits.map(commit => commit.areaId));
+  const activeAreaIds = new Set(todayCommits.flatMap(commit => commit.impactAreas.map(impact => impact.areaId)));
   const commitCount = todayCommits.length;
   const percent = Math.min(100, (commitCount / 10) * 100);
 
@@ -199,7 +201,7 @@ export default function Home() {
   const handleCreateCommit = async (input: {
     title: string;
     description: string;
-    areaId: number;
+    impactAreas: string[];
     type: CommitType;
     tags: string[];
     seed: string;

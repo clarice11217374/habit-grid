@@ -3,6 +3,7 @@ import { getSupabaseClient } from './supabase';
 import type {
   Area,
   AreaGoal,
+  CommitImpact,
   CreateCommitInput,
   DashboardStats,
   Entry,
@@ -11,7 +12,7 @@ import type {
   LifeCommit,
 } from './db';
 
-export type { Area, AreaGoal, CreateCommitInput, DashboardStats, Entry, GratitudeEntry, GratitudeOverview, LifeCommit };
+export type { Area, AreaGoal, CommitImpact, CreateCommitInput, DashboardStats, Entry, GratitudeEntry, GratitudeOverview, LifeCommit };
 
 const USER_ID = 'clarice';
 const STOP_WORDS = new Set(['i', "i'm", 'im', 'am', 'the', 'a', 'an', 'to', 'for', 'and', 'of', 'in', 'is', 'it', 'that', 'my', 'me', 'with', 'today']);
@@ -39,17 +40,19 @@ function nextDate(dateString: string, amount: number) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-function mapCommit(row: Record<string, unknown>, areas: Map<number, Area>): LifeCommit {
+function mapCommit(row: Record<string, unknown>, areas: Map<number, Area>, impacts: CommitImpact[] = []): LifeCommit {
   const areaId = Number(row.area_id);
   const area = areas.get(areaId) || LIFE_AREAS.find(item => item.id === areaId) || LIFE_AREAS[0];
+  const resolvedImpacts = impacts.length ? impacts : [{ areaId: area.id, areaName: area.name, areaColor: area.color, impactValue: 1 }];
   return {
     id: Number(row.id),
     title: String(row.title || ''),
     description: String(row.description || ''),
     date: String(row.date || ''),
-    areaId,
-    areaName: area.name,
-    areaColor: area.color,
+    areaId: resolvedImpacts[0].areaId,
+    areaName: resolvedImpacts[0].areaName,
+    areaColor: resolvedImpacts[0].areaColor,
+    impactAreas: resolvedImpacts,
     type: COMMIT_TYPES.includes(row.type as never) ? row.type as LifeCommit['type'] : 'Reflection',
     tags: Array.isArray(row.tags) ? row.tags.filter(tag => typeof tag === 'string') as string[] : [],
     seed: String(row.seed || ''),
@@ -80,28 +83,52 @@ export async function getCommits(options: { date?: string; areaId?: number; limi
 
   let query = supabase.from('commits').select('*').eq('user_id', USER_ID).order('date', { ascending: false }).order('created_at', { ascending: false });
   if (options.date) query = query.eq('date', options.date);
-  if (options.areaId) query = query.eq('area_id', options.areaId);
-  if (options.limit) query = query.limit(options.limit);
   const result = await query;
   const areas = new Map((await getAreas()).map(area => [area.id, area]));
-  return (assertData(result.data, result.error) as Record<string, unknown>[]).map(row => mapCommit(row, areas));
+  const rows = assertData(result.data, result.error) as Record<string, unknown>[];
+  const impactMap = new Map<number, CommitImpact[]>();
+  if (rows.length) {
+    const impactsResult = await supabase.from('commit_impacts').select('commit_id,area_id,impact_value').eq('user_id', USER_ID).in('commit_id', rows.map(row => Number(row.id)));
+    for (const impact of assertData(impactsResult.data, impactsResult.error) as { commit_id: number; area_id: number; impact_value: number }[]) {
+      const area = areas.get(Number(impact.area_id));
+      if (!area) continue;
+      const mapped = { areaId: area.id, areaName: area.name, areaColor: area.color, impactValue: Number(impact.impact_value) };
+      impactMap.set(Number(impact.commit_id), [...(impactMap.get(Number(impact.commit_id)) || []), mapped]);
+    }
+  }
+  let commits = rows.map(row => mapCommit(row, areas, impactMap.get(Number(row.id)) || []));
+  if (options.areaId) commits = commits.filter(commit => commit.impactAreas.some(impact => impact.areaId === options.areaId));
+  if (options.limit) commits = commits.slice(0, options.limit);
+  return commits;
 }
 
 export async function createCommit(input: CreateCommitInput): Promise<LifeCommit> {
   const supabase = getSupabaseClient();
   if (!supabase) return (await localDb()).createCommit(input);
 
+  const impactAreaIds = [...new Set(input.impactAreaIds)];
+  if (!impactAreaIds.length) throw new Error('Select at least one impact area');
   const result = await supabase.from('commits').insert({
     user_id: USER_ID,
     title: input.title,
     description: input.description,
     date: input.date,
-    area_id: input.areaId,
+    area_id: input.areaId || impactAreaIds[0],
     type: input.type,
     tags: [...new Set(input.tags.map(tag => tag.trim()).filter(Boolean))],
     seed: input.seed.trim(),
   }).select('*').single();
   const row = assertData(result.data, result.error) as Record<string, unknown>;
+  const impactResult = await supabase.from('commit_impacts').insert(impactAreaIds.map(areaId => ({
+    user_id: USER_ID,
+    commit_id: Number(row.id),
+    area_id: areaId,
+    impact_value: 1,
+  })));
+  if (impactResult.error) {
+    await supabase.from('commits').delete().eq('user_id', USER_ID).eq('id', Number(row.id));
+    throw new Error(impactResult.error.message);
+  }
 
   if (input.tags.length) {
     const tags = [...new Set(input.tags.map(name => name.trim()).filter(Boolean))].map(name => ({ user_id: USER_ID, name }));
@@ -112,23 +139,35 @@ export async function createCommit(input: CreateCommitInput): Promise<LifeCommit
   }
 
   const areas = new Map((await getAreas()).map(area => [area.id, area]));
-  return mapCommit(row, areas);
+  return mapCommit(row, areas, impactAreaIds.map(areaId => {
+    const area = areas.get(areaId) || LIFE_AREAS[0];
+    return { areaId, areaName: area.name, areaColor: area.color, impactValue: 1 };
+  }));
 }
 
 async function entriesForYear(year: number, areaId?: number): Promise<Entry[]> {
   const supabase = getSupabaseClient();
   if (!supabase) return areaId ? (await localDb()).getAreaEntries(areaId, year) : (await localDb()).getAllAreaEntriesForYear(year);
 
-  let query = supabase.from('commits').select('id,area_id,date,title').eq('user_id', USER_ID).gte('date', `${year}-01-01`).lte('date', `${year}-12-31`);
-  if (areaId) query = query.eq('area_id', areaId);
-  const result = await query;
+  const result = await supabase.from('commits').select('id,area_id,date,title').eq('user_id', USER_ID).gte('date', `${year}-01-01`).lte('date', `${year}-12-31`);
+  const rows = assertData(result.data, result.error) as { id: number; area_id: number; date: string; title: string }[];
+  const impactResult = rows.length
+    ? await supabase.from('commit_impacts').select('commit_id,area_id').eq('user_id', USER_ID).in('commit_id', rows.map(row => row.id))
+    : { data: [], error: null };
+  const impactsByCommit = new Map<number, number[]>();
+  for (const impact of assertData(impactResult.data, impactResult.error) as { commit_id: number; area_id: number }[]) {
+    impactsByCommit.set(impact.commit_id, [...(impactsByCommit.get(impact.commit_id) || []), impact.area_id]);
+  }
   const groups = new Map<string, Entry>();
-  for (const row of assertData(result.data, result.error) as { id: number; area_id: number; date: string; title: string }[]) {
-    const key = `${row.area_id}:${row.date}`;
-    const current = groups.get(key) || { id: row.id, area_id: row.area_id, date: row.date, count: 0, completed: 1, titles: [] };
-    current.count++;
-    current.titles.push(row.title);
-    groups.set(key, current);
+  for (const row of rows) {
+    for (const impactedAreaId of impactsByCommit.get(row.id) || [row.area_id]) {
+      if (areaId && impactedAreaId !== areaId) continue;
+      const key = `${impactedAreaId}:${row.date}`;
+      const current = groups.get(key) || { id: row.id, area_id: impactedAreaId, date: row.date, count: 0, completed: 1, titles: [] };
+      current.count++;
+      current.titles.push(row.title);
+      groups.set(key, current);
+    }
   }
   return [...groups.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -303,7 +342,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   };
   for (const commit of commits) {
     commitDates.add(commit.date);
-    areaCounts.set(commit.areaId, (areaCounts.get(commit.areaId) || 0) + 1);
+    for (const impact of commit.impactAreas) areaCounts.set(impact.areaId, (areaCounts.get(impact.areaId) || 0) + 1);
     if (commit.date >= dateDaysAgo(29)) recent.set(commit.date, (recent.get(commit.date) || 0) + 1);
   }
   let streakDays = 0;
