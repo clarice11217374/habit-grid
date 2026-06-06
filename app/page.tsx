@@ -211,7 +211,10 @@ export default function Home() {
     });
 
     if (!res.ok) {
-      const error = await res.json();
+      const contentType = res.headers.get('content-type') || '';
+      const error = contentType.includes('application/json')
+        ? await res.json()
+        : { error: `Save Commit failed with HTTP ${res.status}. The server returned a non-JSON response.` };
       throw new Error(error.error || 'Failed to save commit');
     }
     await refresh();

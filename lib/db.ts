@@ -17,6 +17,7 @@ function resolveDatabasePath() {
   if (!fs.existsSync(writablePath) && fs.existsSync(bundledPath)) {
     try {
       fs.copyFileSync(bundledPath, writablePath);
+      fs.chmodSync(writablePath, 0o600);
     } catch (error) {
       console.error(`[db] Could not copy bundled SQLite seed to ${writablePath}; starting with an empty temporary database`, error);
     }
@@ -371,7 +372,11 @@ export function createCommit(input: CreateCommitInput): LifeCommit {
     VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, ?)
   `).run(input.title, input.description, input.date, input.areaId, input.type, JSON.stringify(tags), input.seed, input.description, input.areaId);
 
-  return getCommits({ limit: 1 }).find(commit => commit.id === Number(result.lastInsertRowid)) as LifeCommit;
+  const row = db.prepare(`${commitSelect('WHERE c.id = ?')} LIMIT 1`).get(Number(result.lastInsertRowid)) as Parameters<typeof toCommit>[0] | undefined;
+  if (!row) {
+    throw new Error('Commit was saved but could not be read back');
+  }
+  return toCommit(row);
 }
 
 export function getSeeds() {
