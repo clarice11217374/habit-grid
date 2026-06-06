@@ -20,7 +20,16 @@ function getColorIntensity(baseColor: string, count: number): string {
 }
 
 function formatDate(date: Date): string {
-  return date.toISOString().split('T')[0];
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseLocalDate(dateString: string): Date | null {
+  const [year, month, day] = dateString.split('-').map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
 }
 
 function getDaysInYear(year: number): Date[] {
@@ -115,12 +124,14 @@ function YearGrid({ year, color, entryMap }: GridProps) {
 
   return (
     <div className="overflow-x-auto">
-      <div className="flex mb-2 text-xs text-zinc-500 pl-8">
+      <div
+        className="grid mb-2 text-xs text-zinc-500 pl-8"
+        style={{ gridTemplateColumns: `repeat(${weeks.length}, 11px)`, columnGap: '3px' }}
+      >
         {monthLabels.map(({ month, weekIndex }) => (
           <span
             key={`${month}-${weekIndex}`}
-            style={{ marginLeft: weekIndex === 0 ? 0 : `${(weekIndex - (monthLabels.find(label => label.weekIndex < weekIndex)?.weekIndex || 0)) * 14 - 20}px` }}
-            className="first:ml-0"
+            style={{ gridColumnStart: weekIndex + 1 }}
           >
             {month}
           </span>
@@ -154,6 +165,7 @@ function YearGrid({ year, color, entryMap }: GridProps) {
           ))}
         </div>
       </div>
+
     </div>
   );
 }

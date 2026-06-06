@@ -72,14 +72,14 @@ function CommitItem({ commit }: { commit: LifeCommit }) {
 
 function TodayProgress({ areas, todayCommits }: { areas: Area[]; todayCommits: LifeCommit[] }) {
   const activeAreaIds = new Set(todayCommits.map(commit => commit.areaId));
-  const activeCount = activeAreaIds.size;
-  const percent = areas.length > 0 ? (activeCount / areas.length) * 100 : 0;
+  const commitCount = todayCommits.length;
+  const percent = Math.min(100, (commitCount / 10) * 100);
 
   return (
     <section className="bg-zinc-800/50 rounded-xl p-5 mb-6">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <h2 className="text-xl font-semibold">Today Progress</h2>
-        <span className="text-sm text-zinc-500">{activeCount} / {areas.length || 9} areas active today</span>
+        <span className="text-sm text-zinc-500">{commitCount} / 10 commits today</span>
       </div>
       <div className="h-3 rounded-full bg-zinc-900/60 overflow-hidden mb-4">
         <div
