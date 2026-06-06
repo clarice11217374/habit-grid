@@ -1,32 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { apiError } from '@/lib/api';
 import { deleteSeed, getSeeds, renameSeed } from '@/lib/db';
 
+export const runtime = 'nodejs';
+
 export async function GET() {
-  return NextResponse.json(getSeeds());
+  try {
+    return NextResponse.json(getSeeds());
+  } catch (error: unknown) {
+    return apiError('/api/seeds GET', error);
+  }
 }
 
 export async function PATCH(request: NextRequest) {
-  const body = await request.json();
-  const from = typeof body.from === 'string' ? body.from : '';
-  const to = typeof body.to === 'string' ? body.to : '';
-
   try {
+    const body = await request.json();
+    const from = typeof body.from === 'string' ? body.from : '';
+    const to = typeof body.to === 'string' ? body.to : '';
     renameSeed(from, to);
     return NextResponse.json({ ok: true });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to rename seed';
-    return NextResponse.json({ error: message }, { status: 400 });
+    return apiError('/api/seeds PATCH', error, 'Failed to rename seed');
   }
 }
 
 export async function DELETE(request: NextRequest) {
-  const name = request.nextUrl.searchParams.get('name') || '';
-
   try {
+    const name = request.nextUrl.searchParams.get('name') || '';
     deleteSeed(name);
     return NextResponse.json({ ok: true });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to delete seed';
-    return NextResponse.json({ error: message }, { status: 400 });
+    return apiError('/api/seeds DELETE', error, 'Failed to delete seed');
   }
 }

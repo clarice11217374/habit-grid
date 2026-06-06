@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { apiError } from '@/lib/api';
 import { createGratitudeEntry, getGratitudeEntries } from '@/lib/db';
+
+export const runtime = 'nodejs';
 
 function todayDate() {
   const date = new Date();
@@ -10,23 +13,26 @@ function todayDate() {
 }
 
 export async function GET(request: NextRequest) {
-  const date = request.nextUrl.searchParams.get('date') || todayDate();
-  return NextResponse.json(getGratitudeEntries(date));
+  try {
+    const date = request.nextUrl.searchParams.get('date') || todayDate();
+    return NextResponse.json(getGratitudeEntries(date));
+  } catch (error: unknown) {
+    return apiError('/api/gratitude GET', error);
+  }
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const text = typeof body.text === 'string' ? body.text.trim() : '';
-  const date = typeof body.date === 'string' && body.date ? body.date : todayDate();
-
-  if (!text) {
-    return NextResponse.json({ error: 'Gratitude text is required' }, { status: 400 });
-  }
-
   try {
+    const body = await request.json();
+    const text = typeof body.text === 'string' ? body.text.trim() : '';
+    const date = typeof body.date === 'string' && body.date ? body.date : todayDate();
+
+    if (!text) {
+      return NextResponse.json({ error: 'Gratitude text is required' }, { status: 400 });
+    }
+
     return NextResponse.json(createGratitudeEntry(date, text), { status: 201 });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to save gratitude';
-    return NextResponse.json({ error: message }, { status: 400 });
+    return apiError('/api/gratitude POST', error, 'Failed to save gratitude');
   }
 }

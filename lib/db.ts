@@ -1,9 +1,32 @@
 import Database from 'better-sqlite3';
+import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { COMMIT_TYPES, LIFE_AREAS } from './constants';
 import type { CommitType } from './constants';
 
-const dbPath = path.join(process.cwd(), 'data', 'habits.db');
+function resolveDatabasePath() {
+  const bundledPath = path.resolve(process.cwd(), 'data', 'habits.db');
+  if (process.env.VERCEL !== '1') {
+    return bundledPath;
+  }
+
+  const deploymentId = (process.env.VERCEL_DEPLOYMENT_ID || 'runtime').replace(/[^a-zA-Z0-9_-]/g, '-');
+  const writablePath = path.join(os.tmpdir(), `clarice-life-commit-${deploymentId}.db`);
+
+  if (!fs.existsSync(writablePath) && fs.existsSync(bundledPath)) {
+    try {
+      fs.copyFileSync(bundledPath, writablePath);
+    } catch (error) {
+      console.error(`[db] Could not copy bundled SQLite seed to ${writablePath}; starting with an empty temporary database`, error);
+    }
+  }
+
+  console.info(`[db] Using ephemeral Vercel SQLite database at ${writablePath}`);
+  return writablePath;
+}
+
+const dbPath = resolveDatabasePath();
 const db = new Database(dbPath);
 
 export { COMMIT_TYPES, LIFE_AREAS };

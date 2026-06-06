@@ -1,32 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { apiError } from '@/lib/api';
 import { deleteTag, getTags, renameTag } from '@/lib/db';
 
+export const runtime = 'nodejs';
+
 export async function GET() {
-  return NextResponse.json(getTags());
+  try {
+    return NextResponse.json(getTags());
+  } catch (error: unknown) {
+    return apiError('/api/tags GET', error);
+  }
 }
 
 export async function PATCH(request: NextRequest) {
-  const body = await request.json();
-  const from = typeof body.from === 'string' ? body.from : '';
-  const to = typeof body.to === 'string' ? body.to : '';
-
   try {
+    const body = await request.json();
+    const from = typeof body.from === 'string' ? body.from : '';
+    const to = typeof body.to === 'string' ? body.to : '';
     renameTag(from, to);
     return NextResponse.json({ ok: true });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to rename tag';
-    return NextResponse.json({ error: message }, { status: 400 });
+    return apiError('/api/tags PATCH', error, 'Failed to rename tag');
   }
 }
 
 export async function DELETE(request: NextRequest) {
-  const name = request.nextUrl.searchParams.get('name') || '';
-
   try {
+    const name = request.nextUrl.searchParams.get('name') || '';
     deleteTag(name);
     return NextResponse.json({ ok: true });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to delete tag';
-    return NextResponse.json({ error: message }, { status: 400 });
+    return apiError('/api/tags DELETE', error, 'Failed to delete tag');
   }
 }
