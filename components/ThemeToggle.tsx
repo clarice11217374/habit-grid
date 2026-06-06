@@ -29,10 +29,10 @@ export default function ThemeToggle() {
     <button
       type="button"
       onClick={toggleTheme}
-      className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors text-sm"
+      className="lc-button lc-button-secondary"
       aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
     >
-      {theme === 'light' ? 'Dark' : 'Light'}
+      {theme === 'light' ? 'Dark mode' : 'Light mode'}
     </button>
   );
 }

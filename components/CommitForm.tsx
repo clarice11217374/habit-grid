@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { Area, CommitType } from '@/lib/db';
 import { COMMIT_TYPES } from '@/lib/constants';
+import { Card, CardHeader, CardTitle, Input, Textarea } from './ui';
 
 const RECOMMENDATION_RULES = [
   {
@@ -196,7 +197,14 @@ export default function CommitForm({ areas, onCommit }: CommitFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-zinc-800/50 rounded-xl p-5 mb-6">
+    <Card>
+      <CardHeader>
+        <div>
+          <CardTitle>New Commit</CardTitle>
+          <p className="lc-card-description">Record what you created, learned, or moved forward.</p>
+        </div>
+      </CardHeader>
+      <form onSubmit={handleSubmit} className="lc-card-content">
       {suggestion && (
         <div className="mb-4 rounded-lg border border-zinc-700/60 bg-zinc-900/60 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -209,7 +217,7 @@ export default function CommitForm({ areas, onCommit }: CommitFormProps) {
             <button
               type="button"
               onClick={applySuggestion}
-              className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm transition-colors"
+              className="lc-button lc-button-secondary"
             >
               Apply suggestion
             </button>
@@ -219,20 +227,19 @@ export default function CommitForm({ areas, onCommit }: CommitFormProps) {
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-4 mb-4">
         <div>
-          <label className="block text-sm text-zinc-400 mb-2">Title</label>
-          <input
+          <label className="lc-label">Title</label>
+          <Input
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             placeholder="Forked my first GitHub project"
-            className="w-full px-4 py-2 bg-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-white/30"
           />
         </div>
         <div>
-          <label className="block text-sm text-zinc-400 mb-2">Type</label>
+          <label className="lc-label">Type</label>
           <select
             value={type}
             onChange={(event) => setType(event.target.value as CommitType)}
-            className="w-full px-4 py-2 bg-zinc-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-white/30"
+            className="lc-input"
           >
             {COMMIT_TYPES.map(commitType => (
               <option key={commitType} value={commitType}>{commitType}</option>
@@ -242,7 +249,7 @@ export default function CommitForm({ areas, onCommit }: CommitFormProps) {
       </div>
 
       <div className="mb-4">
-        <label className="block text-sm text-zinc-400 mb-2">Impact Areas</label>
+        <label className="lc-label">Impact Areas</label>
         <div className="flex flex-wrap gap-2">
           {areas.map(area => {
             const selected = impactAreaIds.includes(area.id);
@@ -268,38 +275,35 @@ export default function CommitForm({ areas, onCommit }: CommitFormProps) {
       </div>
 
       <div className="mb-4">
-        <label className="block text-sm text-zinc-400 mb-2">Description</label>
-        <textarea
+        <label className="lc-label">Description</label>
+        <Textarea
           value={description}
           onChange={(event) => setDescription(event.target.value)}
           rows={3}
           placeholder="What did this move forward, create, teach, or reveal?"
-          className="w-full px-4 py-2 bg-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-white/30 resize-none"
         />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <div>
-          <label className="block text-sm text-zinc-400 mb-2">Tags</label>
-          <input
+          <label className="lc-label">Tags</label>
+          <Input
             value={tags}
             onChange={(event) => setTags(event.target.value)}
             list="tag-options"
             placeholder="GitHub, React, Next.js"
-            className="w-full px-4 py-2 bg-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-white/30"
           />
           <datalist id="tag-options">
             {tagOptions.map(tag => <option key={tag} value={tag} />)}
           </datalist>
         </div>
         <div>
-          <label className="block text-sm text-zinc-400 mb-2">Future Seed</label>
-          <input
+          <label className="lc-label">Future Seed</label>
+          <Input
             value={seed}
             onChange={(event) => setSeed(event.target.value)}
             list="seed-options"
             placeholder="Life Commit, career growth"
-            className="w-full px-4 py-2 bg-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-white/30"
           />
           <datalist id="seed-options">
             {seedOptions.map(option => <option key={option} value={option} />)}
@@ -312,10 +316,11 @@ export default function CommitForm({ areas, onCommit }: CommitFormProps) {
       <button
         type="submit"
         disabled={loading || impactAreaIds.length === 0}
-        className="px-5 py-2 bg-white text-zinc-950 rounded-lg font-medium hover:bg-zinc-200 transition-colors disabled:opacity-50"
+        className="lc-button lc-button-primary"
       >
         {loading ? 'Saving...' : 'Save Commit'}
       </button>
-    </form>
+      </form>
+    </Card>
   );
 }

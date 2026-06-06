@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import CommitForm from '@/components/CommitForm';
+import DashboardShell from '@/components/DashboardShell';
 import HabitGrid from '@/components/HabitGrid';
 import MiniHabitGrid from '@/components/MiniHabitGrid';
 import ThemeToggle from '@/components/ThemeToggle';
@@ -289,40 +290,29 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-900 text-white p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
-          <div>
-            <p className="text-sm font-medium text-zinc-400 mb-1">Clarice Life Commit</p>
-            <h1 className="text-3xl font-bold">What did you commit today?</h1>
-          </div>
-          <div className="flex gap-2">
-            <Link href="/seeds" className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors">Seeds</Link>
-            <Link href="/gratitude" className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors">Gratitude</Link>
-            <ThemeToggle />
-          </div>
-        </div>
+    <DashboardShell title="Clarice Life Commit" description="What did you commit today?">
+      <div className="lc-grid">
 
         <TodayProgress areas={areas} todayCommits={todayCommits} />
 
         <CommitForm areas={areas} onCommit={handleCreateCommit} />
 
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className="bg-zinc-800/50 rounded-xl p-5">
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="lc-card lc-stat">
             <div className="text-zinc-400 text-sm mb-1">Total Commits</div>
             <div className="text-4xl font-bold">{dashboard?.totalCommits ?? 0}</div>
           </div>
-          <div className="bg-zinc-800/50 rounded-xl p-5">
+          <div className="lc-card lc-stat">
             <div className="text-zinc-400 text-sm mb-1">Commit Streak</div>
             <div className="text-4xl font-bold">{dashboard?.streakDays ?? 0}</div>
           </div>
-          <div className="bg-zinc-800/50 rounded-xl p-5">
+          <div className="lc-card lc-stat">
             <div className="text-zinc-400 text-sm mb-3">Last 30 Days</div>
             <Recent30Heatmap days={dashboard?.recent30 ?? []} />
           </div>
         </section>
 
-        <section className="bg-zinc-800/50 rounded-xl p-5 mb-8">
+        <section className="lc-card p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">Today</h2>
             <span className="text-sm text-zinc-500">{today}</span>
@@ -330,7 +320,7 @@ export default function Home() {
           {todayCommits.length === 0 ? <p className="text-zinc-400">No commits yet today</p> : todayCommits.map(commit => <CommitItem key={commit.id} commit={commit} />)}
         </section>
 
-        <section className="bg-zinc-800/50 rounded-xl p-5 mb-8">
+        <section className="lc-card p-5">
           <h2 className="text-xl font-semibold mb-4">This Week</h2>
           {thisWeekCommits.length === 0 ? (
             <p className="text-zinc-400">No commits this week yet</p>
@@ -346,19 +336,19 @@ export default function Home() {
           )}
         </section>
 
-        <section className="bg-zinc-800/50 rounded-xl p-5 mb-8">
+        <section className="lc-card p-5">
           <h2 className="text-xl font-semibold mb-4">Recent Commits</h2>
           {recentCommits.length === 0 ? <p className="text-zinc-400">No commits yet</p> : recentCommits.slice(0, 12).map(commit => <CommitItem key={commit.id} commit={commit} />)}
         </section>
 
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-          <div className="bg-zinc-800/50 rounded-xl p-5">
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="lc-card p-5">
             <h2 className="text-xl font-semibold mb-4">Top Tags</h2>
             <div className="flex flex-wrap gap-2">
               {(dashboard?.topTags.length ? dashboard.topTags : []).map(tag => <span key={tag.name} className="px-2 py-1 rounded bg-zinc-900/70 text-sm">{tag.name} · {tag.count}</span>)}
             </div>
           </div>
-          <div className="bg-zinc-800/50 rounded-xl p-5">
+          <div className="lc-card p-5">
             <h2 className="text-xl font-semibold mb-4">Top Seeds</h2>
             <div className="flex flex-wrap gap-2">
               {(dashboard?.topSeeds.length ? dashboard.topSeeds : []).map(seed => <span key={seed.name} className="px-2 py-1 rounded bg-zinc-900/70 text-sm">{seed.name} · {seed.count}</span>)}
@@ -366,7 +356,7 @@ export default function Home() {
           </div>
         </section>
 
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex items-center gap-4">
           <button onClick={() => setYear(value => value - 1)} className="p-2 hover:bg-zinc-800 rounded-lg transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -396,6 +386,6 @@ export default function Home() {
           ))}
         </div>
       </div>
-    </main>
+    </DashboardShell>
   );
 }

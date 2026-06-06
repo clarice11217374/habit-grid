@@ -1,8 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import ThemeToggle from '@/components/ThemeToggle';
+import DashboardShell from '@/components/DashboardShell';
 import type { GratitudeEntry, GratitudeOverview } from '@/lib/db';
 
 function localDate(date = new Date()) {
@@ -139,19 +138,8 @@ export default function GratitudePage() {
   };
 
   return (
-    <main className="min-h-screen bg-zinc-900 text-white p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-          <div>
-            <p className="text-sm font-medium text-zinc-400 mb-1">Clarice Life Commit</p>
-            <h1 className="text-3xl font-bold">Gratitude — {selectedDate}</h1>
-          </div>
-          <div className="flex gap-2">
-            <Link href="/" className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors">Dashboard</Link>
-            <ThemeToggle />
-          </div>
-        </div>
-
+    <DashboardShell title={`Gratitude — ${selectedDate}`} description="Notice and preserve what made the day meaningful.">
+      <div className="lc-grid">
         <section className="bg-zinc-800/50 rounded-xl p-4 mb-6">
           <div className="flex flex-wrap items-center gap-2">
             <button onClick={() => setSelectedDate(today)} className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm">Today</button>
@@ -259,6 +247,6 @@ export default function GratitudePage() {
           </div>
         </section>
       </div>
-    </main>
+    </DashboardShell>
   );
 }

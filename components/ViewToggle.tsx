@@ -7,24 +7,22 @@ interface ViewToggleProps {
 
 export default function ViewToggle({ view, onToggle }: ViewToggleProps) {
   return (
-    <div className="flex bg-zinc-800 rounded-lg p-1 mb-6">
+    <div className="lc-tabs" role="tablist" aria-label="Contribution view">
       <button
+        type="button"
+        role="tab"
+        aria-selected={view === 'year'}
         onClick={() => onToggle('year')}
-        className={`px-4 py-2 rounded-md font-medium transition-colors ${
-          view === 'year'
-            ? 'bg-zinc-700 text-white'
-            : 'text-zinc-400 hover:text-zinc-200'
-        }`}
+        className={view === 'year' ? 'active' : ''}
       >
         Year
       </button>
       <button
+        type="button"
+        role="tab"
+        aria-selected={view === 'month'}
         onClick={() => onToggle('month')}
-        className={`px-4 py-2 rounded-md font-medium transition-colors ${
-          view === 'month'
-            ? 'bg-zinc-700 text-white'
-            : 'text-zinc-400 hover:text-zinc-200'
-        }`}
+        className={view === 'month' ? 'active' : ''}
       >
         Month
       </button>

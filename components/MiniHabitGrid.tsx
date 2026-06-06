@@ -85,7 +85,7 @@ export default function MiniHabitGrid({ habitName, color, year, entries, onClick
   return (
     <div
       onClick={onClick}
-      className="bg-zinc-800/50 rounded-xl p-4 hover:bg-zinc-800 transition-all cursor-pointer group"
+      className="lc-card p-4 hover:bg-zinc-800 transition-all cursor-pointer group"
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
