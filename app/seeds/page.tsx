@@ -29,8 +29,8 @@ export default function SeedsPage() {
 
   async function loadData() {
     const [seedRes, tagRes] = await Promise.all([
-      fetch('/api/seeds'),
-      fetch('/api/tags'),
+      fetch('/api/seeds', { cache: 'no-store' }),
+      fetch('/api/tags', { cache: 'no-store' }),
     ]);
     setSeeds(await seedRes.json());
     setTags(await tagRes.json());

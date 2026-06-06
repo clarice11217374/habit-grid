@@ -111,8 +111,8 @@ export default function CommitForm({ areas, onCommit }: CommitFormProps) {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/seeds').then(res => res.json()),
-      fetch('/api/tags').then(res => res.json()),
+      fetch('/api/seeds', { cache: 'no-store' }).then(res => res.json()),
+      fetch('/api/tags', { cache: 'no-store' }).then(res => res.json()),
     ]).then(([seedGroups, tagGroups]) => {
       setSeedOptions(Array.isArray(seedGroups) ? seedGroups.map(group => group.seed).filter(Boolean) : []);
       setTagOptions(Array.isArray(tagGroups) ? tagGroups.map(group => group.tag).filter(Boolean) : []);
@@ -184,8 +184,8 @@ export default function CommitForm({ areas, onCommit }: CommitFormProps) {
       setSeed('');
       setSuggestion(null);
       const [seedGroups, tagGroups] = await Promise.all([
-        fetch('/api/seeds').then(res => res.json()),
-        fetch('/api/tags').then(res => res.json()),
+        fetch('/api/seeds', { cache: 'no-store' }).then(res => res.json()),
+        fetch('/api/tags', { cache: 'no-store' }).then(res => res.json()),
       ]);
       setSeedOptions(Array.isArray(seedGroups) ? seedGroups.map(group => group.seed).filter(Boolean) : []);
       setTagOptions(Array.isArray(tagGroups) ? tagGroups.map(group => group.tag).filter(Boolean) : []);

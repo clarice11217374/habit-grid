@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { apiError } from '@/lib/api';
-import { createGratitudeEntry, getGratitudeEntries } from '@/lib/db';
+import { apiError, apiJson } from '@/lib/api';
+import { createGratitudeEntry, getGratitudeEntries, getGratitudeOverview } from '@/lib/db';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 function todayDate() {
   const date = new Date();
@@ -14,8 +15,11 @@ function todayDate() {
 
 export async function GET(request: NextRequest) {
   try {
+    if (request.nextUrl.searchParams.get('overview') === '1') {
+      return apiJson(getGratitudeOverview());
+    }
     const date = request.nextUrl.searchParams.get('date') || todayDate();
-    return NextResponse.json(getGratitudeEntries(date));
+    return apiJson(getGratitudeEntries(date));
   } catch (error: unknown) {
     return apiError('/api/gratitude GET', error);
   }
@@ -31,7 +35,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Gratitude text is required' }, { status: 400 });
     }
 
-    return NextResponse.json(createGratitudeEntry(date, text), { status: 201 });
+    return apiJson(createGratitudeEntry(date, text), { status: 201 });
   } catch (error: unknown) {
     return apiError('/api/gratitude POST', error, 'Failed to save gratitude');
   }

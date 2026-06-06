@@ -70,6 +70,16 @@ export interface GratitudeEntry {
   createdAt: string;
 }
 
+export interface GratitudeOverview {
+  totalGratitudes: number;
+  currentStreak: number;
+  longestStreak: number;
+  uniqueWords: number;
+  topKeywords: { word: string; count: number }[];
+  dailyCounts: { date: string; count: number }[];
+  timeline: { date: string; entries: GratitudeEntry[] }[];
+}
+
 export interface AreaGoal {
   areaId: number;
   sixMonthGoal: string;
@@ -489,6 +499,78 @@ export function createGratitudeEntry(date: string, text: string): GratitudeEntry
     FROM gratitude_entries
     WHERE id = ?
   `).get(result.lastInsertRowid) as GratitudeEntry;
+}
+
+const GRATITUDE_STOP_WORDS = new Set([
+  'i', "i'm", 'im', 'am', 'the', 'a', 'an', 'to', 'for', 'and', 'of', 'in', 'is', 'it', 'that', 'my', 'me', 'with', 'today',
+]);
+
+function gratitudeWords(text: string) {
+  return (text.toLowerCase().match(/[a-z0-9']+/g) || [])
+    .filter(word => word.length > 1 && !GRATITUDE_STOP_WORDS.has(word));
+}
+
+function nextDate(dateString: string, amount: number) {
+  const [year, month, day] = dateString.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  date.setDate(date.getDate() + amount);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+export function getGratitudeOverview(): GratitudeOverview {
+  const entries = db.prepare(`
+    SELECT id, date, text, created_at as createdAt
+    FROM gratitude_entries
+    ORDER BY date DESC, created_at DESC, id DESC
+  `).all() as GratitudeEntry[];
+
+  const dailyCounts = db.prepare(`
+    SELECT date, COUNT(*) as count
+    FROM gratitude_entries
+    GROUP BY date
+    ORDER BY date
+  `).all() as { date: string; count: number }[];
+
+  const dates = dailyCounts.map(day => day.date);
+  const dateSet = new Set(dates);
+  let currentStreak = 0;
+  for (let date = dateDaysAgo(0); dateSet.has(date); date = nextDate(date, -1)) {
+    currentStreak++;
+  }
+
+  let longestStreak = 0;
+  let runningStreak = 0;
+  let previousDate = '';
+  for (const date of dates) {
+    runningStreak = previousDate && nextDate(previousDate, 1) === date ? runningStreak + 1 : 1;
+    longestStreak = Math.max(longestStreak, runningStreak);
+    previousDate = date;
+  }
+
+  const wordCounts = new Map<string, number>();
+  for (const entry of entries) {
+    for (const word of gratitudeWords(entry.text)) {
+      wordCounts.set(word, (wordCounts.get(word) || 0) + 1);
+    }
+  }
+
+  const timelineMap = new Map<string, GratitudeEntry[]>();
+  for (const entry of entries.slice(0, 100)) {
+    timelineMap.set(entry.date, [...(timelineMap.get(entry.date) || []), entry]);
+  }
+
+  return {
+    totalGratitudes: entries.length,
+    currentStreak,
+    longestStreak,
+    uniqueWords: wordCounts.size,
+    topKeywords: [...wordCounts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, 30)
+      .map(([word, count]) => ({ word, count })),
+    dailyCounts,
+    timeline: [...timelineMap.entries()].map(([date, groupedEntries]) => ({ date, entries: groupedEntries })),
+  };
 }
 
 function dateDaysAgo(days: number) {

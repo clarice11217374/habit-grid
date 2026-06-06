@@ -130,11 +130,11 @@ export default function Home() {
 
   async function refresh() {
     const [areasRes, entriesRes, todayRes, recentRes, dashboardRes] = await Promise.all([
-      fetch('/api/areas'),
-      fetch(`/api/entries?area=all&year=${year}`),
-      fetch(`/api/commits?date=${today}`),
-      fetch('/api/commits?limit=30'),
-      fetch('/api/dashboard'),
+      fetch('/api/areas', { cache: 'no-store' }),
+      fetch(`/api/entries?area=all&year=${year}`, { cache: 'no-store' }),
+      fetch(`/api/commits?date=${today}`, { cache: 'no-store' }),
+      fetch('/api/commits?limit=30', { cache: 'no-store' }),
+      fetch('/api/dashboard', { cache: 'no-store' }),
     ]);
     setAreas(await areasRes.json());
     setAllEntries(await entriesRes.json());
@@ -148,11 +148,11 @@ export default function Home() {
 
     async function loadInitialData() {
       const [areasRes, entriesRes, todayRes, recentRes, dashboardRes] = await Promise.all([
-        fetch('/api/areas'),
-        fetch(`/api/entries?area=all&year=${year}`),
-        fetch(`/api/commits?date=${today}`),
-        fetch('/api/commits?limit=30'),
-        fetch('/api/dashboard'),
+        fetch('/api/areas', { cache: 'no-store' }),
+        fetch(`/api/entries?area=all&year=${year}`, { cache: 'no-store' }),
+        fetch(`/api/commits?date=${today}`, { cache: 'no-store' }),
+        fetch('/api/commits?limit=30', { cache: 'no-store' }),
+        fetch('/api/dashboard', { cache: 'no-store' }),
       ]);
 
       if (!cancelled) {
@@ -174,8 +174,8 @@ export default function Home() {
   useEffect(() => {
     if (activeArea !== null) {
       Promise.all([
-        fetch(`/api/entries?area=${activeArea}&year=${year}`),
-        fetch(`/api/commits?area=${activeArea}&limit=20`),
+        fetch(`/api/entries?area=${activeArea}&year=${year}`, { cache: 'no-store' }),
+        fetch(`/api/commits?area=${activeArea}&limit=20`, { cache: 'no-store' }),
       ]).then(async ([entriesRes, commitsRes]) => {
         setAreaEntries(await entriesRes.json());
         setRecentCommits(await commitsRes.json());
