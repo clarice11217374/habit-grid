@@ -206,6 +206,7 @@ export default function Home() {
   }) => {
     const res = await fetch('/api/commits', {
       method: 'POST',
+      cache: 'no-store',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...input, date: today }),
     });

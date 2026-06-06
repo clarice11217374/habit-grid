@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import type { Entry } from '@/lib/db';
+import { heatmapColor, heatmapTooltip } from '@/lib/heatmap';
 
 interface HabitGridProps {
   habitId: number;
@@ -12,24 +13,11 @@ interface HabitGridProps {
   entries: Entry[];
 }
 
-function getColorIntensity(baseColor: string, count: number): string {
-  if (count <= 0) return 'var(--grid-empty)';
-  if (count === 1) return `${baseColor}88`;
-  if (count === 2) return `${baseColor}cc`;
-  return baseColor;
-}
-
 function formatDate(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
-}
-
-function parseLocalDate(dateString: string): Date | null {
-  const [year, month, day] = dateString.split('-').map(Number);
-  if (!year || !month || !day) return null;
-  return new Date(year, month - 1, day);
 }
 
 function getDaysInYear(year: number): Date[] {
@@ -59,8 +47,8 @@ const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function HabitGrid({ color, view, year, month, entries }: HabitGridProps) {
   const entryMap = useMemo(() => {
-    const map = new Map<string, number>();
-    entries.forEach(entry => map.set(entry.date, entry.count));
+    const map = new Map<string, Pick<Entry, 'count' | 'titles'>>();
+    entries.forEach(entry => map.set(entry.date, { count: entry.count, titles: entry.titles || [] }));
     return map;
   }, [entries]);
 
@@ -74,7 +62,7 @@ interface GridProps {
   year: number;
   month?: number;
   color: string;
-  entryMap: Map<string, number>;
+  entryMap: Map<string, Pick<Entry, 'count' | 'titles'>>;
 }
 
 function YearGrid({ year, color, entryMap }: GridProps) {
@@ -157,7 +145,7 @@ function YearGrid({ year, color, entryMap }: GridProps) {
                   key={dayIndex}
                   day={day}
                   color={color}
-                  count={day ? entryMap.get(formatDate(day)) || 0 : 0}
+                  entry={day ? entryMap.get(formatDate(day)) : undefined}
                   size="small"
                 />
               ))}
@@ -215,7 +203,7 @@ function MonthGrid({ year, month, color, entryMap }: GridProps & { month: number
                 key={dayIndex}
                 day={day}
                 color={color}
-                count={day ? entryMap.get(formatDate(day)) || 0 : 0}
+                entry={day ? entryMap.get(formatDate(day)) : undefined}
                 size="large"
                 showDate
               />
@@ -230,18 +218,19 @@ function MonthGrid({ year, month, color, entryMap }: GridProps & { month: number
 interface DayCellProps {
   day: Date | null;
   color: string;
-  count: number;
+  entry?: Pick<Entry, 'count' | 'titles'>;
   size: 'small' | 'large';
   showDate?: boolean;
 }
 
-function DayCell({ day, color, count, size, showDate }: DayCellProps) {
+function DayCell({ day, color, entry, size, showDate }: DayCellProps) {
   if (!day) {
     return <div className={size === 'small' ? 'w-[11px] h-[11px]' : 'w-10 h-10'} />;
   }
 
   const isToday = formatDate(day) === formatDate(new Date());
-  const bgColor = getColorIntensity(color, count);
+  const count = entry?.count || 0;
+  const bgColor = heatmapColor(color, count);
 
   return (
     <div
@@ -252,7 +241,7 @@ function DayCell({ day, color, count, size, showDate }: DayCellProps) {
         flex items-center justify-center
       `}
       style={{ backgroundColor: bgColor }}
-      title={`${day.toDateString()}${count > 0 ? ` - ${count} commits` : ''}`}
+      title={heatmapTooltip(formatDate(day), count, entry?.titles)}
     >
       {showDate && size === 'large' && (
         <span className={`text-xs ${count > 0 ? 'text-white/90' : 'text-zinc-500'}`}>

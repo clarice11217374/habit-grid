@@ -122,6 +122,7 @@ export default function GratitudePage() {
     try {
       const res = await fetch('/api/gratitude', {
         method: 'POST',
+        cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: selectedDate, text: text.trim() }),
       });

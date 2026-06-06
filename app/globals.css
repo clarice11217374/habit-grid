@@ -14,6 +14,10 @@
   --input-bg: #ffffff;
   --hover-bg: #f1ece5;
   --grid-empty: #e8e2d8;
+  --heat-level-1: 25%;
+  --heat-level-2: 45%;
+  --heat-level-3: 70%;
+  --heat-level-4: 100%;
   --placeholder: #a59b91;
   --button-bg: #24292f;
   --button-text: #ffffff;
@@ -33,6 +37,10 @@
   --input-bg: #242429;
   --hover-bg: #2b2b31;
   --grid-empty: #2b2b2f;
+  --heat-level-1: 30%;
+  --heat-level-2: 55%;
+  --heat-level-3: 80%;
+  --heat-level-4: 100%;
   --placeholder: #71717a;
   --button-bg: #f4f4f5;
   --button-text: #121214;

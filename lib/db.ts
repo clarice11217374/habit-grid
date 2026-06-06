@@ -47,6 +47,7 @@ export interface Entry {
   date: string;
   count: number;
   completed: number;
+  titles: string[];
 }
 
 export interface LifeCommit {
@@ -327,25 +328,27 @@ export function updateAreaGoal(areaId: number, input: Omit<AreaGoal, 'areaId' | 
 export function getAreaEntries(areaId: number, year: number): Entry[] {
   const startDate = `${year}-01-01`;
   const endDate = `${year}-12-31`;
-  return db.prepare(`
-    SELECT MIN(id) as id, area_id, date, COUNT(*) as count, 1 as completed
+  const rows = db.prepare(`
+    SELECT MIN(id) as id, area_id, date, COUNT(*) as count, 1 as completed, json_group_array(title) as titles
     FROM commits
     WHERE area_id = ? AND date >= ? AND date <= ?
     GROUP BY area_id, date
     ORDER BY date
-  `).all(areaId, startDate, endDate) as Entry[];
+  `).all(areaId, startDate, endDate) as (Omit<Entry, 'titles'> & { titles: string })[];
+  return rows.map(row => ({ ...row, titles: parseTags(row.titles) }));
 }
 
 export function getAllAreaEntriesForYear(year: number): Entry[] {
   const startDate = `${year}-01-01`;
   const endDate = `${year}-12-31`;
-  return db.prepare(`
-    SELECT MIN(id) as id, area_id, date, COUNT(*) as count, 1 as completed
+  const rows = db.prepare(`
+    SELECT MIN(id) as id, area_id, date, COUNT(*) as count, 1 as completed, json_group_array(title) as titles
     FROM commits
     WHERE date >= ? AND date <= ?
     GROUP BY area_id, date
     ORDER BY date
-  `).all(startDate, endDate) as Entry[];
+  `).all(startDate, endDate) as (Omit<Entry, 'titles'> & { titles: string })[];
+  return rows.map(row => ({ ...row, titles: parseTags(row.titles) }));
 }
 
 export function getCommits(options: { date?: string; areaId?: number; limit?: number } = {}): LifeCommit[] {

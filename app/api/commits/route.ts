@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { apiError } from '@/lib/api';
+import { NextRequest } from 'next/server';
+import { apiError, apiJson } from '@/lib/api';
 import { COMMIT_TYPES } from '@/lib/constants';
 import type { CommitType } from '@/lib/constants';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 function todayDate() {
   const date = new Date();
@@ -20,7 +22,7 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get('date') || undefined;
     const areaId = searchParams.get('area') ? Number(searchParams.get('area')) : undefined;
     const limit = searchParams.get('limit') ? Number(searchParams.get('limit')) : undefined;
-    return NextResponse.json(getCommits({ date, areaId, limit }));
+    return apiJson(getCommits({ date, areaId, limit }));
   } catch (error: unknown) {
     return apiError('/api/commits GET', error);
   }
@@ -52,12 +54,12 @@ export async function POST(request: NextRequest) {
     const seed = typeof body.seed === 'string' ? body.seed.trim() : '';
 
     if (!title) {
-      return NextResponse.json({ error: 'Commit title is required' }, { status: 400 });
+      return apiJson({ error: 'Commit title is required' }, { status: 400 });
     }
 
     const { createCommit } = await import('@/lib/db');
     const commit = createCommit({ title, description, date, areaId, type, tags, seed });
-    return NextResponse.json(commit, { status: 201 });
+    return apiJson(commit, { status: 201 });
   } catch (error: unknown) {
     return apiError('/api/commits POST', error, 'Failed to create commit');
   }

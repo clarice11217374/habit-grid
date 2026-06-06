@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { apiError, apiJson } from '@/lib/api';
 import { createGratitudeEntry, getGratitudeEntries, getGratitudeOverview } from '@/lib/db';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 function todayDate() {
   const date = new Date();
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
     const date = typeof body.date === 'string' && body.date ? body.date : todayDate();
 
     if (!text) {
-      return NextResponse.json({ error: 'Gratitude text is required' }, { status: 400 });
+      return apiJson({ error: 'Gratitude text is required' }, { status: 400 });
     }
 
     return apiJson(createGratitudeEntry(date, text), { status: 201 });

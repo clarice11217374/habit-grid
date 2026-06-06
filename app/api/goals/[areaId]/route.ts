@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { apiError } from '@/lib/api';
+import { NextRequest } from 'next/server';
+import { apiError, apiJson } from '@/lib/api';
 import { getArea, getAreaGoal, updateAreaGoal } from '@/lib/db';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 interface RouteContext {
   params: Promise<{ areaId: string }>;
@@ -15,10 +17,10 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     const area = getArea(id);
 
     if (!area) {
-      return NextResponse.json({ error: 'Area not found' }, { status: 404 });
+      return apiJson({ error: 'Area not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ area, goal: getAreaGoal(id) });
+    return apiJson({ area, goal: getAreaGoal(id) });
   } catch (error: unknown) {
     return apiError('/api/goals/[areaId] GET', error);
   }
@@ -42,7 +44,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       visionText: typeof body.visionText === 'string' ? body.visionText : '',
       visionImages,
     });
-    return NextResponse.json(goal);
+    return apiJson(goal);
   } catch (error: unknown) {
     return apiError('/api/goals/[areaId] PUT', error, 'Failed to save goal');
   }

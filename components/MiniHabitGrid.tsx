@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import type { Entry } from '@/lib/db';
+import { heatmapColor, heatmapTooltip } from '@/lib/heatmap';
 
 interface MiniHabitGridProps {
   habitName: string;
@@ -31,8 +32,8 @@ function getDaysInYear(year: number): Date[] {
 
 export default function MiniHabitGrid({ habitName, color, year, entries, onClick }: MiniHabitGridProps) {
   const entryMap = useMemo(() => {
-    const map = new Map<string, number>();
-    entries.forEach(entry => map.set(entry.date, entry.count));
+    const map = new Map<string, Pick<Entry, 'count' | 'titles'>>();
+    entries.forEach(entry => map.set(entry.date, { count: entry.count, titles: entry.titles || [] }));
     return map;
   }, [entries]);
 
@@ -72,7 +73,7 @@ export default function MiniHabitGrid({ habitName, color, year, entries, onClick
       const date = new Date(today);
       date.setDate(date.getDate() - i);
       const dateStr = formatDate(date);
-      if ((entryMap.get(dateStr) || 0) > 0) {
+      if ((entryMap.get(dateStr)?.count || 0) > 0) {
         streak++;
       } else {
         break;
@@ -109,15 +110,17 @@ export default function MiniHabitGrid({ habitName, color, year, entries, onClick
           {weeks.map((week, weekIndex) => (
             <div key={weekIndex} className="flex flex-col gap-[2px]">
               {week.map((day, dayIndex) => {
-                const count = day ? entryMap.get(formatDate(day)) || 0 : 0;
+                const date = day ? formatDate(day) : '';
+                const entry = date ? entryMap.get(date) : undefined;
+                const count = entry?.count || 0;
                 return (
                   <div
                     key={dayIndex}
                     className="w-[8px] h-[8px] rounded-[2px]"
                     style={{
-                      backgroundColor: !day ? 'transparent' : count > 0 ? color : 'var(--grid-empty)',
-                      opacity: !day || count === 0 ? 1 : Math.min(1, 0.35 + count * 0.25),
+                      backgroundColor: !day ? 'transparent' : heatmapColor(color, count),
                     }}
+                    title={day ? heatmapTooltip(date, count, entry?.titles) : undefined}
                   />
                 );
               })}

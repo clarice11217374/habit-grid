@@ -41,9 +41,9 @@ export default function GoalPage() {
 
     async function load() {
       const [goalRes, entriesRes, commitsRes] = await Promise.all([
-        fetch(`/api/goals/${areaId}`),
-        fetch(`/api/entries?area=${areaId}&year=${year}`),
-        fetch(`/api/commits?area=${areaId}&limit=20`),
+        fetch(`/api/goals/${areaId}`, { cache: 'no-store' }),
+        fetch(`/api/entries?area=${areaId}&year=${year}`, { cache: 'no-store' }),
+        fetch(`/api/commits?area=${areaId}&limit=20`, { cache: 'no-store' }),
       ]);
 
       if (cancelled) return;
@@ -83,6 +83,7 @@ export default function GoalPage() {
     try {
       const res = await fetch(`/api/goals/${areaId}`, {
         method: 'PUT',
+        cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sixMonthGoal: goal.sixMonthGoal,
@@ -99,6 +100,12 @@ export default function GoalPage() {
       }
 
       setGoal(await res.json());
+      const [entriesRes, commitsRes] = await Promise.all([
+        fetch(`/api/entries?area=${areaId}&year=${year}`, { cache: 'no-store' }),
+        fetch(`/api/commits?area=${areaId}&limit=20`, { cache: 'no-store' }),
+      ]);
+      setEntries(await entriesRes.json());
+      setCommits(await commitsRes.json());
       setMessage('Saved');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to save goal');

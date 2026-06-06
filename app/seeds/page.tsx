@@ -47,6 +47,7 @@ export default function SeedsPage() {
 
     const res = await fetch('/api/seeds', {
       method: 'PATCH',
+      cache: 'no-store',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ from, to }),
     });
@@ -66,7 +67,7 @@ export default function SeedsPage() {
     if (!confirm(`Delete seed "${name}" from all related commits?`)) return;
     setError('');
 
-    const res = await fetch(`/api/seeds?name=${encodeURIComponent(name)}`, { method: 'DELETE' });
+    const res = await fetch(`/api/seeds?name=${encodeURIComponent(name)}`, { method: 'DELETE', cache: 'no-store' });
     if (!res.ok) {
       const body = await res.json();
       setError(body.error || 'Failed to delete seed');
@@ -83,6 +84,7 @@ export default function SeedsPage() {
 
     const res = await fetch('/api/tags', {
       method: 'PATCH',
+      cache: 'no-store',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ from, to }),
     });
@@ -102,7 +104,7 @@ export default function SeedsPage() {
     if (!confirm(`Delete tag "${name}" from all related commits?`)) return;
     setError('');
 
-    const res = await fetch(`/api/tags?name=${encodeURIComponent(name)}`, { method: 'DELETE' });
+    const res = await fetch(`/api/tags?name=${encodeURIComponent(name)}`, { method: 'DELETE', cache: 'no-store' });
     if (!res.ok) {
       const body = await res.json();
       setError(body.error || 'Failed to delete tag');

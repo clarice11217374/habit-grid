@@ -4,6 +4,7 @@ import { deleteSeed, getSeeds, renameSeed } from '@/lib/db';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET() {
   try {
@@ -19,7 +20,7 @@ export async function PATCH(request: NextRequest) {
     const from = typeof body.from === 'string' ? body.from : '';
     const to = typeof body.to === 'string' ? body.to : '';
     renameSeed(from, to);
-    return apiJson({ ok: true });
+    return apiJson(getSeeds());
   } catch (error: unknown) {
     return apiError('/api/seeds PATCH', error, 'Failed to rename seed');
   }
@@ -29,7 +30,7 @@ export async function DELETE(request: NextRequest) {
   try {
     const name = request.nextUrl.searchParams.get('name') || '';
     deleteSeed(name);
-    return apiJson({ ok: true });
+    return apiJson(getSeeds());
   } catch (error: unknown) {
     return apiError('/api/seeds DELETE', error, 'Failed to delete seed');
   }
